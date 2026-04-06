@@ -487,7 +487,7 @@ function saveDB(db){localStorage.setItem('ocbcgl4',JSON.stringify(db));}
 function mkDB(){
   const yr=new Date().getFullYear().toString();
   return{
-    players:[],
+    players:["Bob Pfiefer", "Bob Sanders", "Brian Sanders", "Chris Brady", "Chuck Geis", "Chuck Steinmetz", "Curtis Uren", "Dan Sulisz", "Doug Currie", "Doug Young", "Eric Smith", "Greg Keller", "Herb Freibe", "Jeff Jarvis", "Jeff Landry", "Jim Fields", "Joe Boyle", "Joe Leininger", "Joe Szydlowski", "John Arthurs", "John Dent", "John Mariani", "John Powers", "Kris Mclogan", "Mike Dentamaro", "Nate Edmonds", "Nemo Yaldo", "Pete Harrop", "Rick Kincaid", "Sam Shanbom", "Steve Shepard", "Steve Tomba", "Todd Mack", "Tom Fields", "Tony Edmonds", "Vince Santavicia"],
     subs:[],
     years:{[yr]:{weeks:[],currentWeek:1,currentSide:'front'}},
     activeYear:yr,
