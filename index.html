@@ -1139,7 +1139,7 @@ function addPlayer(){
   const inp=document.getElementById('new-player');const name=inp.value.trim();if(!name)return;
   const db=getDB();
   if(db.players.includes(name)||db.subs.includes(name)){showToast('Already exists');return;}
-  db.players.push(name);db.players.sort();saveDB(db);inp.value='';renderPlayers();populateSelects();
+  db.players.push(name);db.players.sort((a,b)=>a.split(' ')[0].localeCompare(b.split(' ')[0]));saveDB(db);inp.value='';renderPlayers();populateSelects();
   syncRosterToSheet();showToast(`${name} added`);
 }
 function removePlayer(i){const db=getDB();const n=db.players.splice(i,1)[0];saveDB(db);renderPlayers();populateSelects();syncRosterToSheet();showToast(`${n} removed`);}
