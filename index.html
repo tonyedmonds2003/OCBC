@@ -205,7 +205,7 @@ label:first-child{margin-top:0}
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-lbl">Year</div><div class="stat-val" id="h-year" style="font-size:18px;color:var(--navy)">2025</div></div>
       <div class="stat-card"><div class="stat-lbl">Week</div><div class="stat-val" id="h-week" style="color:var(--navy)">1</div></div>
-      <div class="stat-card"><div class="stat-lbl">CTP Pot</div><div class="stat-val" style="color:var(--gold);font-size:18px">$108</div></div>
+      <div class="stat-card"><div class="stat-lbl">CTP Pot</div><div class="stat-val" style="color:var(--gold);font-size:18px" id="h-ctp-pot">$72</div></div>
       <div class="stat-card"><div class="stat-lbl">Skins Pot</div><div class="stat-val" style="color:var(--green);font-size:18px">$180</div></div>
     </div>
     <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--rsm);padding:9px 12px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between">
@@ -217,11 +217,12 @@ label:first-child{margin-top:0}
     <button class="btn btn-secondary" style="margin-top:7px;padding:10px;font-size:14px" onclick="showTab('history')">📅 Season History</button>
     <button class="btn btn-secondary" style="margin-top:7px;padding:10px;font-size:14px" onclick="showTab('ctp')">🎯 CTP Leaderboard</button>
   </div>
+  <div id="week-alert-banner"></div>
   <div class="section" style="padding-top:0">
     <div class="card" style="padding:9px 11px">
       <div class="card-title" style="margin-bottom:6px">Par 3 Holes — CTP</div>
       <div id="h-par3s"></div>
-      <div style="font-size:10px;color:var(--text2);margin-top:5px">CTP winner = highest tee time number on that hole</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:5px">$36 per hole · CTP winner = highest tee time number</div>
     </div>
   </div>
 </div>
@@ -389,13 +390,21 @@ label:first-child{margin-top:0}
         <label>Active Year</label>
         <select id="adm-year" onchange="changeYear()"></select>
         <button class="btn btn-secondary" style="margin-top:8px" onclick="addNewYear()">+ Start New Year</button>
-        <label style="margin-top:10px">Current Week Number</label>
-        <input type="number" id="adm-week" min="1" max="40" value="1" onchange="saveWeekCfg()">
-        <label style="margin-top:10px">Course Side This Week</label>
+        <label style="margin-top:10px">Season Start Date (first Thursday)</label>
+        <input type="date" id="adm-start-date" onchange="saveWeekCfg()">
+        <p style="font-size:11px;color:var(--text2);margin-top:4px">The app calculates the current week automatically from this date every Thursday. Week 1 = first Thursday, Week 2 = second Thursday, etc.</p>
+        <label style="margin-top:10px">Week 1 Course Side</label>
         <select id="adm-side" onchange="saveWeekCfg()">
           <option value="front">Front 9</option>
           <option value="back">Back 9</option>
         </select>
+        <div style="background:var(--green-l);border:1px solid var(--green);border-radius:var(--rsm);padding:10px;margin-top:10px">
+          <div style="font-size:12px;font-weight:600;color:var(--green-d)">Current week calculated from date:</div>
+          <div style="font-size:18px;font-weight:700;color:var(--green-d);margin-top:3px" id="adm-calc-week">Set start date above</div>
+        </div>
+        <label style="margin-top:10px">Override Week Number (optional)</label>
+        <input type="number" id="adm-week" min="1" max="40" placeholder="Leave blank to use date-based week" onchange="saveWeekCfg()">
+        <p style="font-size:11px;color:var(--text2);margin-top:4px">Only fill this in if you need to manually override the date calculation.</p>
       </div>
 
       <!-- Players -->
@@ -410,6 +419,33 @@ label:first-child{margin-top:0}
       </div>
 
       <!-- Danger -->
+      <div class="card">
+        <div class="card-title">⛅ Rainout Week</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Mark the current week as a rainout — no scores, week still counts toward the season.</p>
+        <button class="btn btn-secondary" onclick="markRainout()">Mark This Week as Rainout</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔄 Override Course Side</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Use this if the course sends you to a different side than scheduled.</p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary" style="flex:1" onclick="overrideSide('front')">Force Front 9</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="overrideSide('back')">Force Back 9</button>
+        </div>
+        <div id="side-override-status" style="font-size:12px;color:var(--text2);margin-top:6px;text-align:center"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🏌️ Scramble Week Settings</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Designate a week as the 4-person scramble (default: Week 14). Set the total prize pot — split evenly among winning team players.</p>
+        <label>Scramble Week Number</label>
+        <input type="number" id="scramble-week-num" min="1" max="16" value="14" onchange="saveScrambleSettings()">
+        <label style="margin-top:10px">Total Scramble Prize Pot ($)</label>
+        <input type="number" id="scramble-pot" min="0" value="0" placeholder="e.g. 200" onchange="saveScrambleSettings()">
+        <p style="font-size:11px;color:var(--text2);margin-top:4px">Each of the 4 winning players receives pot ÷ 4</p>
+        <div id="scramble-status" style="margin-top:8px;font-size:13px;font-weight:600;color:var(--green-d)"></div>
+      </div>
+
       <div class="card">
         <div class="card-title">Danger Zone</div>
         <button class="btn btn-danger" onclick="doConfirm('Reset scores for the current year? Player roster is kept.', resetSeason)">Reset Current Year Data</button>
@@ -489,7 +525,7 @@ function mkDB(){
   return{
     players:["Bob Pfiefer", "Bob Sanders", "Brian Sanders", "Chris Brady", "Chuck Geis", "Chuck Steinmetz", "Curtis Uren", "Dan Sulisz", "Doug Currie", "Doug Young", "Eric Smith", "Greg Keller", "Herb Freibe", "Jeff Jarvis", "Jeff Landry", "Jim Fields", "Joe Boyle", "Joe Leininger", "Joe Szydlowski", "John Arthurs", "John Dent", "John Mariani", "John Powers", "Kris Mclogan", "Mike Dentamaro", "Nate Edmonds", "Nemo Yaldo", "Pete Harrop", "Rick Kincaid", "Sam Shanbom", "Steve Shepard", "Steve Tomba", "Todd Mack", "Tom Fields", "Tony Edmonds", "Vince Santavicia"],
     subs:[],
-    years:{[yr]:{weeks:[],currentWeek:1,currentSide:'front'}},
+    years:{[yr]:{weeks:[],currentWeek:1,currentSide:'front',seasonStartDate:'',leagueDay:4,scrambleWeek:14,scramblePot:0,sideOverride:null,rainouts:[]}},
     activeYear:yr,
     sheetUrl:'https://script.google.com/macros/s/AKfycbwCfREuyTwSiD_rR3mJXUnNOG-GB9cDLVwsJxTapCJlc0Zxx3i7vOl4SwuG-u2rjiFjwg/exec',
     adminPw: DEFAULT_PW,
@@ -497,8 +533,43 @@ function mkDB(){
   };
 }
 function getYear(db){
-  if(!db.years[db.activeYear]) db.years[db.activeYear]={weeks:[],currentWeek:1,currentSide:'front'};
+  if(!db.years[db.activeYear]) db.years[db.activeYear]={weeks:[],currentWeek:1,currentSide:'front',seasonStartDate:'',leagueDay:4,scrambleWeek:14,scramblePot:0,sideOverride:null,rainouts:[]};
   return db.years[db.activeYear];
+}
+
+function calcCurrentWeek(yr){
+  // If no season start date set, fall back to manual week number
+  if(!yr.seasonStartDate) return yr.currentWeek;
+  const start=new Date(yr.seasonStartDate);
+  const now=new Date();
+  // Find the most recent Thursday (leagueDay=4)
+  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const startDay=new Date(start.getFullYear(),start.getMonth(),start.getDate());
+  const diffMs=today-startDay;
+  if(diffMs<0) return 1;
+  const diffDays=Math.floor(diffMs/(1000*60*60*24));
+  const weekNum=Math.floor(diffDays/7)+1;
+  return Math.max(1,weekNum);
+}
+
+function calcCurrentSide(yr){
+  // If commissioner has overridden side for this week, use that
+  if(yr.sideOverride) return yr.sideOverride;
+  // Alternates each week — week 1=front, week 2=back, etc.
+  const wk=calcCurrentWeek(yr);
+  const startSide=yr.startSide||'front';
+  if(wk%2===1) return startSide;
+  return startSide==='front'?'back':'front';
+}
+
+function isScrambleWeek(yr){
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  return wk===(yr.scrambleWeek||14);
+}
+
+function isRainoutWeek(yr){
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  return (yr.rainouts||[]).includes(wk);
 }
 
 // ── STATE ────────────────────────────────────────────────────
@@ -624,15 +695,32 @@ async function refreshFromSheet(){
 // ── HOME ─────────────────────────────────────────────────────
 function renderHome(){
   const db=getDB();const yr=getYear(db);
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  const side=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
   document.getElementById('h-year').textContent=db.activeYear;
-  document.getElementById('h-week').textContent=yr.currentWeek;
-  document.getElementById('h-side').textContent=yr.currentSide==='front'?'Front 9':'Back 9';
-  document.getElementById('home-sub').textContent=`Week ${yr.currentWeek} — ${yr.currentSide==='front'?'Front 9':'Back 9'} — ${db.activeYear}`;
-  const hwn=document.getElementById('hdr-week-num');if(hwn)hwn.textContent=`Week ${yr.currentWeek}`;
-  const hs=document.getElementById('hdr-side');if(hs)hs.textContent=yr.currentSide==='front'?'Front 9':'Back 9';
+  document.getElementById('h-week').textContent=wk;
+  document.getElementById('h-side').textContent=side==='front'?'Front 9':'Back 9';
+  document.getElementById('home-sub').textContent=`Week ${wk} — ${side==='front'?'Front 9':'Back 9'} — ${db.activeYear}`;
+  const hwn=document.getElementById('hdr-week-num');if(hwn)hwn.textContent=`Week ${wk}`;
+  const hs=document.getElementById('hdr-side');if(hs)hs.textContent=side==='front'?'Front 9':'Back 9';
   const holes=HOLES[yr.currentSide];
   const par3s=holes.filter(h=>h.p===3);
-  const perCtp=(108/par3s.length).toFixed(2);
+  const perCtp='36.00';
+  const totalCtp=par3s.length*36;
+  const ctpEl=document.getElementById('h-ctp-pot');
+  if(ctpEl) ctpEl.textContent='$'+totalCtp;
+
+  // Show scramble or rainout banner
+  const banner=document.getElementById('week-alert-banner');
+  if(banner){
+    if(isRainoutWeek(yr)){
+      banner.innerHTML=`<div style="background:#e8ecf5;border-left:4px solid var(--navy);padding:10px 14px;font-size:13px;font-weight:600;color:var(--navy)">⛅ Week ${wk} is marked as a RAINOUT — no scores this week</div>`;
+    } else if(isScrambleWeek(yr)){
+      const pot=yr.scramblePot||0;const pp=(pot/4).toFixed(2);
+      banner.innerHTML=`<div style="background:var(--gold-l);border-left:4px solid var(--gold);padding:10px 14px;font-size:13px;font-weight:600;color:var(--gold-d)">🏌️ Week ${wk} — 4-Person SCRAMBLE${pot>0?` — $${pot} pot ($${pp}/player)`:' — set pot in Admin'}</div>`;
+    } else { banner.innerHTML=''; }
+  }
+
   document.getElementById('h-par3s').innerHTML=par3s.map(h=>
     `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:14px">Hole ${h.n}</span>
@@ -724,7 +812,7 @@ function renderScoringHole(){
   let ctpHtml='';
   if(isPar3){
     const cur=ST.ctpWinners[hole.n]||'';
-    const pp=(108/HOLES[yr.currentSide].filter(h=>h.p===3).length).toFixed(2);
+    const pp=(36/HOLES[yr.currentSide].filter(h=>h.p===3).length).toFixed(2);
     ctpHtml=`<div class="ctp-sec">
       <div class="ctp-lbl">🎯 Closest to the Pin — $${pp} — Tee ${ST.teeTime} has priority</div>
       <select id="ctp${hole.n}">
@@ -825,7 +913,7 @@ function calcResults(){
   const skinCnt=Object.keys(skins).length;
   const skinPay=skinCnt>0?(180/skinCnt):0;
   const par3s=holes.filter(h=>h.p===3);
-  const ctpPay=108/par3s.length;
+  const ctpPay=36;
 
   const money={};names.forEach(n=>money[n]=0);
   const mw=ST.awins>ST.bwins?'A':ST.bwins>ST.awins?'B':null;
@@ -838,8 +926,10 @@ function calcResults(){
   Object.values(skins).forEach(n=>{money[n]=(money[n]||0)+skinPay;});
   Object.values(ST.ctpWinners).filter(v=>v&&v!=='__HIGHER_TEE__').forEach(n=>{if(money[n]!==undefined)money[n]+=ctpPay;});
 
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  const side=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
   const wd={
-    week:yr.currentWeek,side:yr.currentSide,year:db.activeYear,
+    week:wk,side:side,year:db.activeYear,
     date:new Date().toLocaleDateString(),teeTime:ST.teeTime,
     players:ST.players.map(p=>({name:p.name,isSub:p.isSub})),
     scores:JSON.parse(JSON.stringify(ST.scores)),
@@ -849,7 +939,7 @@ function calcResults(){
   };
 
   yr.weeks.push(wd);
-  yr.currentWeek++;yr.currentSide=yr.currentSide==='front'?'back':'front';
+  // Week/side now driven by date — no manual advance needed
   saveDB(db);
   syncToSheet(wd);
   renderResults(wd,hres,skins,skinPay,ctpPay);
@@ -1107,11 +1197,37 @@ function changePassword(){
 // ── ADMIN / YEAR ──────────────────────────────────────────────
 function syncAdminUI(){
   const db=getDB();const yr=getYear(db);
-  document.getElementById('adm-week').value=yr.currentWeek;
-  document.getElementById('adm-side').value=yr.currentSide;
+  const weekEl=document.getElementById('adm-week');
+  if(weekEl) weekEl.value='';
+  const dateEl=document.getElementById('adm-start-date');
+  if(dateEl) dateEl.value=yr.seasonStartDate||'';
+  document.getElementById('adm-side').value=yr.startSide||yr.currentSide||'front';
+  const swEl=document.getElementById('scramble-week-num');if(swEl)swEl.value=yr.scrambleWeek||14;
+  const spEl=document.getElementById('scramble-pot');if(spEl)spEl.value=yr.scramblePot||0;
+  const soEl=document.getElementById('side-override-status');
+  if(soEl&&yr.sideOverride){
+    const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+    soEl.textContent=`Week ${wk} overridden to ${yr.sideOverride==='front'?'Front 9':'Back 9'}`;
+  }
+  const ssEl=document.getElementById('scramble-status');
+  if(ssEl&&yr.scramblePot>0){
+    const perPlayer=((yr.scramblePot||0)/4).toFixed(2);
+    ssEl.textContent=`Week ${yr.scrambleWeek||14} scramble — $${yr.scramblePot} pot — $${perPlayer}/player`;
+  }
   document.getElementById('sheet-url').value=db.sheetUrl||'';
   const sel=document.getElementById('adm-year');
   sel.innerHTML=Object.keys(db.years).sort().reverse().map(y=>`<option value="${y}"${y===db.activeYear?' selected':''}>${y}</option>`).join('');
+  // Show calculated week
+  const calcEl=document.getElementById('adm-calc-week');
+  if(calcEl){
+    if(yr.seasonStartDate){
+      const wk=calcCurrentWeek(yr);
+      const side=calcCurrentSide(yr);
+      calcEl.textContent=`Week ${wk} — ${side==='front'?'Front 9':'Back 9'}`;
+    } else {
+      calcEl.textContent='Set start date above';
+    }
+  }
 }
 function changeYear(){
   const db=getDB();db.activeYear=document.getElementById('adm-year').value;saveDB(db);
@@ -1127,13 +1243,55 @@ function addNewYear(){
 }
 function saveWeekCfg(){
   const db=getDB();const yr=getYear(db);
-  yr.currentWeek=parseInt(document.getElementById('adm-week').value)||1;
-  yr.currentSide=document.getElementById('adm-side').value;
-  saveDB(db);renderHome();showToast('Saved');
+  const dateEl=document.getElementById('adm-start-date');
+  if(dateEl&&dateEl.value) yr.seasonStartDate=dateEl.value;
+  yr.startSide=document.getElementById('adm-side').value;
+  yr.currentSide=yr.startSide;
+  // Only override week if manually entered
+  const manualWeek=parseInt(document.getElementById('adm-week').value);
+  if(manualWeek) yr.currentWeek=manualWeek;
+  saveDB(db);renderHome();syncAdminUI();showToast('Saved');
 }
 function resetSeason(){
-  const db=getDB();const yr=getYear(db);yr.weeks=[];yr.currentWeek=1;yr.currentSide='front';saveDB(db);
-  renderHome();renderLb();renderHistory();renderCTP();syncAdminUI();showToast('Season reset');
+  const db=getDB();const yr=getYear(db);
+  yr.weeks=[];yr.currentWeek=1;yr.currentSide='front';yr.sideOverride=null;yr.rainouts=[];
+  saveDB(db);renderHome();renderLb();renderHistory();renderCTP();syncAdminUI();showToast('Season reset');
+}
+
+function markRainout(){
+  const db=getDB();const yr=getYear(db);
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  if(!yr.rainouts) yr.rainouts=[];
+  if(yr.rainouts.includes(wk)){showToast(`Week ${wk} already marked as rainout`);return;}
+  doConfirm(`Mark Week ${wk} as a rainout? No scores will be entered for this week.`,()=>{
+    yr.rainouts.push(wk);
+    saveDB(db);renderHome();syncAdminUI();
+    showToast(`Week ${wk} marked as rainout ⛅`);
+  });
+}
+
+function overrideSide(side){
+  const db=getDB();const yr=getYear(db);
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  yr.sideOverride=side;
+  saveDB(db);renderHome();
+  document.getElementById('side-override-status').textContent=
+    `Week ${wk} overridden to ${side==='front'?'Front 9':'Back 9'}`;
+  showToast(`Course side changed to ${side==='front'?'Front 9':'Back 9'}`);
+}
+
+function saveScrambleSettings(){
+  const db=getDB();const yr=getYear(db);
+  const wkEl=document.getElementById('scramble-week-num');
+  const potEl=document.getElementById('scramble-pot');
+  if(wkEl) yr.scrambleWeek=parseInt(wkEl.value)||14;
+  if(potEl) yr.scramblePot=parseFloat(potEl.value)||0;
+  saveDB(db);
+  const perPlayer=((yr.scramblePot||0)/4).toFixed(2);
+  const statusEl=document.getElementById('scramble-status');
+  if(statusEl) statusEl.textContent=
+    yr.scramblePot>0?`Week ${yr.scrambleWeek} scramble — $${yr.scramblePot} pot — $${perPlayer}/player`:'';
+  renderHome();showToast('Scramble settings saved');
 }
 
 // ── SHEETS ────────────────────────────────────────────────────
