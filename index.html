@@ -234,7 +234,7 @@ label:first-child{margin-top:0}
     <button class="btn btn-green" onclick="goTo('s-setup')" style="padding:11px;font-size:15px">▶ Enter Foursome Scores</button>
     <button class="btn btn-secondary" style="margin-top:7px;padding:10px;font-size:14px" onclick="showTab('leaderboard')">📊 Leaderboard &amp; Averages</button>
     <button class="btn btn-secondary" style="margin-top:7px;padding:10px;font-size:14px" onclick="showTab('history')">📅 Season History</button>
-    <button class="btn btn-secondary" style="margin-top:7px;padding:10px;font-size:14px" onclick="showTab('ctp')">🎯 CTP Leaderboard</button>
+    <button class="btn btn-secondary" style="margin-top:7px;padding:10px;font-size:14px" onclick="showTab('ctp')">🎯 CTP / Skins</button>
   </div>
   <div id="week-alert-banner"></div>
   <div class="section" style="padding-top:0">
@@ -291,7 +291,7 @@ label:first-child{margin-top:0}
       <div style="margin-top:7px"><label style="display:flex;align-items:center;gap:7px;margin:0;font-size:13px"><input type="checkbox" id="p4-sub" onchange="toggleSub(4)" style="width:17px;height:17px"> Sub / Guest?</label>
       <input type="text" id="p4-sn" placeholder="Sub name" style="display:none;margin-top:5px"></div>
     </div>
-    <button class="btn btn-green" id="btn-go" onclick="if(!highlightSetupErrors())return;startScoring()" disabled>Continue to Scoring →</button>
+    <button class="btn btn-green" id="btn-go" onclick="if(!highlightSetupErrors())return;startScoring()" style="opacity:0.45;cursor:default">Continue to Scoring →</button>
     <button class="btn btn-secondary" onclick="goTo('s-home')">Cancel</button>
   </div>
 </div>
@@ -536,7 +536,7 @@ label:first-child{margin-top:0}
   </button>
   <button class="bnav-btn" id="nb-ctp" onclick="showTab('ctp')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-    <span>CTP</span>
+    <span>CTP/Skins</span>
   </button>
   <button class="bnav-btn" id="nb-admin" onclick="tryOpenAdmin()">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
@@ -827,7 +827,10 @@ function getPVal(n){
 function chkSelects(){
   const tt=document.getElementById('tee-time').value;
   const vals=[1,2,3,4].map(getPVal);
-  document.getElementById('btn-go').disabled=!(tt&&vals.every(v=>v)&&new Set(vals).size===4);
+  const ready=!!(tt&&vals.every(v=>v)&&new Set(vals).size===4);
+  const btn=document.getElementById('btn-go');
+  btn.style.opacity=ready?'1':'0.45';
+  btn.style.cursor=ready?'pointer':'default';
 }
 
 // ── START SCORING ────────────────────────────────────────────
@@ -1518,68 +1521,151 @@ function renderAdminMoneyLb(){
 // ── CTP LEADERBOARD ──────────────────────────────────────────
 function renderCTP(){
   const db=getDB();const yr=getYear(db);
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  const side=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
   document.getElementById('ctp-year-pill').textContent=db.activeYear;
+  const el=document.getElementById('ctp-list');
 
-  // Per-hole: highest tee time with a real CTP winner = winner
+  const weekRounds=yr.weeks.filter(w=>w.week===wk&&w.side===side);
+  const submitted=weekRounds.length;
+  const settled=weekRounds.some(w=>w.skinsSettled);
+
+  const pendingBanner=(!settled)?
+    '<div style="background:var(--gold-l);border:1px solid var(--gold);border-radius:var(--rsm);padding:10px 13px;margin-bottom:14px;display:flex;align-items:center;gap:9px">'
+    +'<span style="font-size:20px">⏳</span>'
+    +'<div><div style="font-size:13px;font-weight:700;color:var(--gold-d)">Winners not finalized yet</div>'
+    +'<div style="font-size:12px;color:var(--gold-d)">'+submitted+' of 9 groups submitted · CTP & skins settle once all 9 are in</div></div>'
+    +'</div>'
+  :'';
+
+  // ── CTP per-hole (current week) ───────────────────────────────────────
   const holeWinners={};
   const allCtpByHole={};
-
-  yr.weeks.forEach(wd=>{
-    Object.entries(wd.ctpWinners||{}).filter(([,v])=>v&&v!=='__HIGHER_TEE__').forEach(([hole,name])=>{
+  weekRounds.forEach(wd=>{
+    Object.entries(wd.ctpWinners||{}).filter(([,v])=>v&&v!==''&&v!=='__HIGHER_TEE__').forEach(([hole,name])=>{
       if(!allCtpByHole[hole]) allCtpByHole[hole]=[];
-      if(!allCtpByHole[hole].find(e=>e.teeTime===wd.teeTime)){
+      if(!allCtpByHole[hole].find(e=>e.teeTime===wd.teeTime))
         allCtpByHole[hole].push({name,teeTime:wd.teeTime});
-      }
-      if(!holeWinners[hole]||wd.teeTime>holeWinners[hole].teeTime){
+      if(!holeWinners[hole]||wd.teeTime>holeWinners[hole].teeTime)
         holeWinners[hole]={name,teeTime:wd.teeTime};
-      }
     });
   });
 
-  const ctpMap={};
-  Object.entries(holeWinners).forEach(([hole,{name}])=>{
-    if(!ctpMap[name])ctpMap[name]={wins:0,holes:[]};
-    ctpMap[name].wins++;ctpMap[name].holes.push('H'+hole);
-  });
-
-  const el=document.getElementById('ctp-list');
-  if(!Object.keys(holeWinners).length){
-    el.innerHTML='<div class="empty-state"><div style="font-size:32px">🎯</div><p>No CTP winners yet.</p></div>';
-    return;
-  }
-
-  const holeRows=Object.keys(allCtpByHole).sort((a,b)=>parseInt(a)-parseInt(b)).map(hole=>{
-    const sorted=[...allCtpByHole[hole]].sort((a,b)=>b.teeTime-a.teeTime);
-    const winner=holeWinners[hole];
+  const holes=HOLES[side];
+  const par3s=holes.filter(h=>h.p===3);
+  const ctpHoleCards=par3s.map(h=>{
+    const entries=allCtpByHole[h.n];
+    if(!entries||!entries.length){
+      return '<div class="card" style="margin-bottom:9px">'
+        +'<div class="card-title">Hole '+h.n+' (Par 3) — CTP</div>'
+        +'<div style="font-size:13px;color:var(--text2);padding:6px 0">⏳ No submissions yet</div>'
+        +'</div>';
+    }
+    const sorted=[...entries].sort((a,b)=>b.teeTime-a.teeTime);
+    const winner=holeWinners[h.n];
     const rows=sorted.map(e=>{
-      const isWinner=e.teeTime===winner.teeTime;
+      const isW=e.teeTime===winner.teeTime;
       return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
-        +'<span class="tee-badge" style="background:'+(isWinner?'var(--gold)':'var(--gray)')+';width:28px;height:28px;font-size:12px">T'+e.teeTime+'</span>'
-        +'<span style="flex:1;font-size:13px;font-weight:'+(isWinner?700:400)+'">'+e.name+'</span>'
-        +(isWinner?'<span class="badge badge-gold">🏆 Winner</span>':'<span style="font-size:11px;color:var(--text2)">beaten by later tee</span>')
+        +'<span class="tee-badge" style="background:'+(isW?'var(--gold)':'var(--gray)')+';width:28px;height:28px;font-size:12px">T'+e.teeTime+'</span>'
+        +'<span style="flex:1;font-size:13px;font-weight:'+(isW?700:400)+'">'+e.name+'</span>'
+        +(isW?'<span class="badge badge-gold">🏆 Winner</span>':'<span style="font-size:11px;color:var(--text2)">beaten by later tee</span>')
         +'</div>';
     }).join('');
     return '<div class="card" style="margin-bottom:9px">'
-      +'<div class="card-title">Hole '+hole+' — CTP</div>'
-      +rows
-      +'</div>';
+      +'<div class="card-title">Hole '+h.n+' (Par 3) — CTP</div>'
+      +rows+'</div>';
   }).join('');
 
-  const summaryEntries=Object.entries(ctpMap).sort((a,b)=>b[1].wins-a[1].wins);
-  const summaryRows=summaryEntries.map(([n,d],i)=>{
+  // CTP season summary (all weeks)
+  const ctpCareer={};
+  yr.weeks.forEach(wd=>{
+    const wkRounds=yr.weeks.filter(w=>w.week===wd.week&&w.side===wd.side);
+    Object.entries(wd.ctpWinners||{}).filter(([,v])=>v&&v!==''&&v!=='__HIGHER_TEE__').forEach(([hole,name])=>{
+      const maxTee=Math.max(...wkRounds.filter(w=>{
+        const v=w.ctpWinners&&w.ctpWinners[hole];
+        return v&&v!==''&&v!=='__HIGHER_TEE__';
+      }).map(w=>w.teeTime));
+      if(wd.teeTime===maxTee){
+        if(!ctpCareer[name])ctpCareer[name]={wins:0,holes:[]};
+        const key='W'+wd.week+'H'+hole;
+        if(!ctpCareer[name].holes.includes(key)){
+          ctpCareer[name].wins++;
+          ctpCareer[name].holes.push(key);
+        }
+      }
+    });
+  });
+  const ctpSummaryRows=Object.entries(ctpCareer).sort((a,b)=>b[1].wins-a[1].wins).map(([n,d],i)=>{
     const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1;
-    return '<div class="lb-row">'
-      +'<div class="lb-rank'+(i<3?' top':'')+'">'+medal+'</div>'
+    return '<div class="lb-row"><div class="lb-rank'+(i<3?' top':'')+'">'+medal+'</div>'
       +'<div class="lb-name">'+n+'</div>'
-      +'<div class="lb-stats"><div style="color:var(--gold-d)">'+d.wins+' win'+(d.wins!==1?'s':'')+
-      '</div><div style="font-size:10px;color:var(--text2)">'+d.holes.join(', ')+'</div></div>'
-      +'</div>';
+      +'<div class="lb-stats"><div style="color:var(--gold-d)">'+d.wins+' CTP win'+(d.wins!==1?'s':'')+'</div>'
+      +'<div style="font-size:10px;color:var(--text2)">'+d.holes.map(h=>h.replace(/W\d+/,'')).join(', ')+'</div></div></div>';
   }).join('');
 
+  // ── Skins per-hole (current week) ─────────────────────────────────────
+  const leagueSkins=weekRounds.length&&weekRounds[0].skins?weekRounds[0].skins:{};
+  const skinPay=weekRounds.length&&weekRounds[0].skinPay?weekRounds[0].skinPay:0;
+  const skinHoleCards=holes.map((hole,hi)=>{
+    const entries=[];
+    weekRounds.forEach(wd=>{
+      wd.players.forEach((pl,i)=>{
+        const sc=wd.scores[hi];
+        if(sc) entries.push({name:pl.name,score:sc['p'+i]||0});
+      });
+    });
+    if(!entries.length) return '';
+    const mn=Math.min(...entries.map(e=>e.score));
+    const leaders=entries.filter(e=>e.score===mn);
+    const winner=leagueSkins[hole.n];
+    const diff=mn-hole.p;
+    const diffColor=diff<0?'var(--blue-d)':diff===0?'var(--text2)':'var(--red)';
+    let statusRow;
+    if(!settled){
+      statusRow='<div style="font-size:12px;color:var(--text2);padding:5px 0">⏳ Pending all groups</div>';
+    } else if(!winner){
+      statusRow='<div style="font-size:12px;color:var(--text2);padding:5px 0">🤝 Skinned out — tied by '+leaders.length+' players ('+leaders.map(e=>fname(e.name)).join(', ')+')</div>';
+    } else {
+      statusRow='<div style="display:flex;align-items:center;gap:8px;padding:5px 0">'
+        +'<span style="flex:1;font-size:13px;font-weight:700">'+winner+'</span>'
+        +'<span class="badge badge-green">💰 $'+skinPay.toFixed(2)+'</span></div>';
+    }
+    return '<div class="card" style="margin-bottom:9px">'
+      +'<div class="card-title" style="display:flex;justify-content:space-between">'
+      +'<span>Hole '+hole.n+' (Par '+hole.p+') — Skin</span>'
+      +'<span style="font-weight:400;color:'+(diff<0?'var(--blue-d)':diff===0?'var(--text2)':'var(--red)')+'">Best: '+mn+' ('+( diff>0?'+':'')+diff+')</span>'
+      +'</div>'+statusRow+'</div>';
+  }).filter(Boolean).join('');
+
+  // Skins season summary
+  const skinsCareer={};
+  yr.weeks.filter(w=>w.skinsSettled).forEach(wd=>{
+    Object.values(wd.skins||{}).forEach(name=>{
+      if(!skinsCareer[name])skinsCareer[name]={skins:0};
+      skinsCareer[name].skins++;
+    });
+  });
+  const skinSummaryRows=Object.entries(skinsCareer).sort((a,b)=>b[1].skins-a[1].skins).map(([n,d],i)=>{
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1;
+    return '<div class="lb-row"><div class="lb-rank'+(i<3?' top':'')+'">'+medal+'</div>'
+      +'<div class="lb-name">'+n+'</div>'
+      +'<div class="lb-stats"><div style="color:var(--green-d)">'+d.skins+' skin'+(d.skins!==1?'s':'')+'</div></div></div>';
+  }).join('');
+
+  // ── Assemble ──────────────────────────────────────────────────────────
+  if(!submitted){
+    el.innerHTML=pendingBanner+'<div class="empty-state"><div style="font-size:32px">🎯</div><p>No rounds submitted this week yet.</p></div>';
+    return;
+  }
   el.innerHTML=
-    '<div style="font-size:11px;color:var(--text2);padding:0 2px 8px">Highest tee time = CTP winner · earlier groups shown for reference</div>'
-    +'<div class="card" style="margin-bottom:12px"><div class="card-title">🏆 CTP Winners Summary</div>'+summaryRows+'</div>'
-    +holeRows;
+    pendingBanner
+    +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);padding:0 2px 8px">🎯 CTP — Week '+wk+'</div>'
+    +ctpHoleCards
+    +(ctpSummaryRows?'<div class="card" style="margin-bottom:16px"><div class="card-title">🏆 CTP Season Leaders</div>'+ctpSummaryRows+'</div>':'')
+    +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);padding:0 2px 8px;margin-top:4px">💰 Skins — Week '+wk+'</div>'
+    +skinHoleCards
+    +(skinSummaryRows?'<div class="card"><div class="card-title">💰 Skins Season Leaders</div>'+skinSummaryRows+'</div>':'')
+  ;
 }
 // ── HISTORY ──────────────────────────────────────────────────
 function renderHistory(){
@@ -1831,8 +1917,8 @@ function showTab(t){
     document.getElementById('tab-'+x).classList.toggle('active',x===t);
     const nb=document.getElementById('nb-'+x);if(nb)nb.classList.toggle('active',x===t);
   });
-  const T={leaderboard:'Leaderboard',history:'Season History',live:'Live Scoring',ctp:'CTP Leaders',admin:'Admin Settings'};
-  const S={leaderboard:'Scores, averages & hot streaks',history:'All rounds played',live:'Live hole-by-hole · updates every 60s',ctp:'Closest to the pin leaders',admin:'Commissioner access'};
+  const T={leaderboard:'Leaderboard',history:'Season History',live:'Live Scoring',ctp:'CTP / Skins',admin:'Admin Settings'};
+  const S={leaderboard:'Scores, averages & hot streaks',history:'All rounds played',live:'Live hole-by-hole · updates every 60s',ctp:'CTP & skins winners · pending until all 9 groups submit',admin:'Commissioner access'};
   document.getElementById('tab-title').textContent=T[t];document.getElementById('tab-sub').textContent=S[t];
   if(t==='live'){startLiveAutoRefresh();}else{stopLiveAutoRefresh();}
   if(t==='leaderboard')renderLb();
