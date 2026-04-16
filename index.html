@@ -370,8 +370,8 @@ label:first-child{margin-top:0}
       <button class="refresh-btn" onclick="refreshLive()">⟳ Refresh</button>
     </div>
     <!-- COLOR LEGEND -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 15px 0;align-items:center">
-      <span style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Legend:</span>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;padding:8px 15px 0;align-items:flex-start">
+      <span style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding-top:2px">Legend:</span>
       <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px">
         <span style="width:18px;height:18px;border-radius:50%;background:#7F77DD;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700">2</span>Eagle
       </span>
@@ -379,10 +379,10 @@ label:first-child{margin-top:0}
         <span style="width:18px;height:18px;border-radius:50%;background:var(--blue-l);display:inline-flex;align-items:center;justify-content:center;color:var(--blue-d);font-size:9px;font-weight:700">3</span>Birdie
       </span>
       <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px">
-        <span style="width:18px;height:18px;border-radius:3px;outline:2px solid var(--gold);display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--gold-d)">3</span>CTP Lead
+        <span style="width:30px;height:18px;border-radius:3px;outline:2px solid var(--gold);display:inline-flex;flex-direction:column;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:var(--gold-d);line-height:1;padding:1px">3<span style="font-size:7px">📍Bob</span></span>CTP Lead
       </span>
       <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px">
-        <span style="width:18px;height:18px;border-radius:3px;outline:2px solid var(--green);display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--green-d)">4</span>Skin Lead
+        <span style="width:30px;height:18px;border-radius:3px;outline:2px solid var(--green);display:inline-flex;flex-direction:column;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:var(--green-d);line-height:1;padding:1px">4<span style="font-size:7px">💰Tom</span></span>Skin Lead
       </span>
     </div>
     <div class="section" id="live-list"></div>
@@ -1130,62 +1130,73 @@ function renderLiveScoring(liveGroups, completedRounds){
       </div>`;
     }).join('');
 
-    // Mini hole grid — with CTP and skin leader indicators
-    // Build all-groups score map for skin/CTP detection
+    // Mini hole grid — with CTP and skin leader indicators + player names
     const holeGrid=holes.map((hole,hi)=>{
       if(hi>=holesPlayed&&isLive) return`<div class="live-hole-cell" style="color:var(--border)">·</div>`;
       const sc=grp.scores[hi];
       if(!sc)return`<div class="live-hole-cell">·</div>`;
 
-      // Individual best score for each player on this hole
       const playerScores=[sc.p0,sc.p1,sc.p2,sc.p3];
       const best=Math.min(...playerScores);
       const diff=best-hole.p;
       const cls=diff<=-2?'eagle':diff===-1?'birdie':diff===0?'par-score':diff===1?'bogey':'double';
       const isCur=isLive&&hi===currentHole;
 
-      // Check if this group leads the skin on this hole
-      // Skin leader = best score seen so far across all groups that have played this hole
+      // Find which player(s) in this group have the best score
+      const bestPlayerIdx=playerScores.indexOf(best);
+      const bestPlayerName=grp.players[bestPlayerIdx]?fname(grp.players[bestPlayerIdx].name):'';
+
       let isSkinLeader=false;
       let isCtpLeader=false;
+      let skinPlayerName='';
+      let ctpPlayerName='';
 
-      // Only check if this hole has been played by this group
       if(hi<holesPlayed){
-        // Find lowest score across ALL groups that have played this hole
+        // Skin: lowest score across ALL groups — unique wins
         let globalMin=best;
         let globalMinCount=0;
+        let skinWinnerName=bestPlayerName;
         Object.values(allGroups).forEach(og=>{
           const oHolesPlayed=og.status==='complete'?9:Math.min(og.holeIdx,8);
-          if(hi<oHolesPlayed&&og.scores[hi]){
+          if(hi<oHolesPlayed&&og.scores[hi]&&og.teeTime!==grp.teeTime){
             const oSc=og.scores[hi];
-            const oBest=Math.min(oSc.p0,oSc.p1,oSc.p2,oSc.p3);
-            if(oBest<globalMin){globalMin=oBest;globalMinCount=1;}
-            else if(oBest===globalMin&&og!==grp) globalMinCount++;
+            const oAll=[oSc.p0,oSc.p1,oSc.p2,oSc.p3];
+            const oBest=Math.min(...oAll);
+            if(oBest<globalMin){globalMin=oBest;globalMinCount=1;
+              const oIdx=oAll.indexOf(oBest);
+              skinWinnerName=og.players[oIdx]?fname(og.players[oIdx].name):'';
+            } else if(oBest===globalMin) globalMinCount++;
           }
         });
-        // This group leads the skin if their best matches global min and it's unique so far
-        if(best===globalMin&&globalMinCount===0) isSkinLeader=true;
+        if(best===globalMin&&globalMinCount===0){isSkinLeader=true;skinPlayerName=bestPlayerName;}
 
-        // CTP leader: par 3 only, highest tee time with a player score on this hole
+        // CTP: par 3 only — highest tee time group leads
         if(hole.p===3){
           let highestTeeCTP=0;
-          let ctpScore=999;
           Object.values(allGroups).forEach(og=>{
             const oHolesPlayed=og.status==='complete'?9:Math.min(og.holeIdx,8);
-            if(hi<oHolesPlayed&&og.scores[hi]){
-              const oSc=og.scores[hi];
-              const oBest=Math.min(oSc.p0,oSc.p1,oSc.p2,oSc.p3);
-              if(og.teeTime>highestTeeCTP||(og.teeTime===highestTeeCTP&&oBest<ctpScore)){
-                highestTeeCTP=og.teeTime;ctpScore=oBest;
-              }
+            if(hi<oHolesPlayed&&og.scores[hi]&&og.teeTime>highestTeeCTP){
+              highestTeeCTP=og.teeTime;
             }
           });
-          if(grp.teeTime===highestTeeCTP) isCtpLeader=true;
+          if(grp.teeTime===highestTeeCTP){
+            isCtpLeader=true;
+            // Find closest player (lowest score) in this group on this par 3
+            const ctpIdx=playerScores.indexOf(best);
+            ctpPlayerName=grp.players[ctpIdx]?fname(grp.players[ctpIdx].name):'';
+          }
         }
       }
 
       const extraCls=isCtpLeader&&isSkinLeader?'ctp-skin':isCtpLeader?'ctp-leader':isSkinLeader?'skin-leader':'';
-      return`<div class="live-hole-cell ${cls}${isCur?' current':''}${extraCls?' '+extraCls:''}">${best}</div>`;
+
+      // Build tooltip-style label below the score
+      let labelParts=[];
+      if(isCtpLeader&&ctpPlayerName) labelParts.push(`<span style="color:var(--gold-d);font-size:9px;font-weight:700">📍${ctpPlayerName}</span>`);
+      if(isSkinLeader&&skinPlayerName) labelParts.push(`<span style="color:var(--green-d);font-size:9px;font-weight:700">💰${skinPlayerName}</span>`);
+      const label=labelParts.length?`<div style="line-height:1.1;margin-top:1px">${labelParts.join('')}</div>`:'';
+
+      return`<div class="live-hole-cell ${cls}${isCur?' current':''}${extraCls?' '+extraCls:''}" style="padding:2px 1px">${best}${label}</div>`;
     }).join('');
 
     const holeLabel=isLive?`Hole ${holes[currentHole]?.n} of ${holes[holes.length-1].n}`:'Complete ✓';
