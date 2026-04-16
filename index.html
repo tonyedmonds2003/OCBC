@@ -693,12 +693,14 @@ async function loadFromSheet(url, year){
     // Merge: sheet is source of truth for weeks
     if(d.rounds && d.rounds.length>0){
       yr.weeks=d.rounds;
-      // Set current week to next after last recorded
-      const lastWeek=Math.max(...d.rounds.map(w=>w.week||0));
-      if(lastWeek>=yr.currentWeek) yr.currentWeek=lastWeek+1;
-      // Infer current side
-      const lastRound=d.rounds[d.rounds.length-1];
-      yr.currentSide=lastRound.side==='front'?'back':'front';
+      // Only auto-advance week/side if no season start date is set
+      // If season start date is set, the date calculation handles it automatically
+      if(!yr.seasonStartDate){
+        const lastWeek=Math.max(...d.rounds.map(w=>w.week||0));
+        if(lastWeek>=yr.currentWeek) yr.currentWeek=lastWeek+1;
+        const lastRound=d.rounds[d.rounds.length-1];
+        yr.currentSide=lastRound.side==='front'?'back':'front';
+      }
     }
     // Load config overrides if sheet has them
     if(d.config){
