@@ -769,7 +769,7 @@ function renderHome(){
   document.getElementById('home-sub').textContent=`Week ${wk} — ${side==='front'?'Front 9':'Back 9'} — ${db.activeYear}`;
   const hwn=document.getElementById('hdr-week-num');if(hwn)hwn.textContent=`Week ${wk}`;
   const hs=document.getElementById('hdr-side');if(hs)hs.textContent=side==='front'?'Front 9':'Back 9';
-  const holes=HOLES[yr.currentSide];
+  const holes=HOLES[side];  // use date-calculated side, not stored currentSide
   const par3s=holes.filter(h=>h.p===3);
   const perCtp='36.00';
   const totalCtp=par3s.length*36;
@@ -828,7 +828,8 @@ function startScoring(){
     if(isSub&&name&&!db.players.includes(name)&&!db.subs.includes(name)){db.subs.push(name);saveDB(db);}
     return{name,isSub:isSub||db.subs.includes(name)};
   });
-  const holes=HOLES[yr.currentSide];
+  const currentSide=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
+  const holes=HOLES[currentSide];
   ST.holeIdx=0;ST.awins=0;ST.bwins=0;
   ST.scores=holes.map(h=>({p0:h.p,p1:h.p,p2:h.p,p3:h.p}));
   ST.ctpWinners={};ST.presses=[];
@@ -838,7 +839,8 @@ function startScoring(){
 // ── SCORING HOLE ─────────────────────────────────────────────
 function renderScoringHole(){
   const db=getDB();const yr=getYear(db);
-  const holes=HOLES[yr.currentSide];
+  const scoringSide=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
+  const holes=HOLES[scoringSide];
   const hole=holes[ST.holeIdx];
   const isPar3=hole.p===3;
 
@@ -935,7 +937,8 @@ function callPress(team){
 }
 function saveCtp(){
   const db=getDB();const yr=getYear(db);
-  const hole=HOLES[yr.currentSide][ST.holeIdx];
+  const ctpSide=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
+  const hole=HOLES[ctpSide][ST.holeIdx];
   if(hole.p===3){const el=document.getElementById('ctp'+hole.n);if(el)ST.ctpWinners[hole.n]=el.value;}
 }
 function resolveHole(){
@@ -1145,6 +1148,8 @@ function renderLiveScoring(liveGroups, completedRounds){
       // Find which player(s) in this group have the best score
       const bestPlayerIdx=playerScores.indexOf(best);
       const bestPlayerName=grp.players[bestPlayerIdx]?fname(grp.players[bestPlayerIdx].name):'';
+      // Count how many in THIS group tied for best
+      const inGroupTies=playerScores.filter(s=>s===best).length;
 
       let isSkinLeader=false;
       let isCtpLeader=false;
@@ -1152,23 +1157,30 @@ function renderLiveScoring(liveGroups, completedRounds){
       let ctpPlayerName='';
 
       if(hi<holesPlayed){
-        // Skin: lowest score across ALL groups — unique wins
+        // Skin: lowest score across ALL groups — any tie (even within group) = no skin
         let globalMin=best;
-        let globalMinCount=0;
-        let skinWinnerName=bestPlayerName;
+        let globalTieCount=0; // total players across ALL groups with this score
+        // count within this group first
+        globalTieCount += inGroupTies;
+
         Object.values(allGroups).forEach(og=>{
           const oHolesPlayed=og.status==='complete'?9:Math.min(og.holeIdx,8);
           if(hi<oHolesPlayed&&og.scores[hi]&&og.teeTime!==grp.teeTime){
             const oSc=og.scores[hi];
             const oAll=[oSc.p0,oSc.p1,oSc.p2,oSc.p3];
             const oBest=Math.min(...oAll);
-            if(oBest<globalMin){globalMin=oBest;globalMinCount=1;
-              const oIdx=oAll.indexOf(oBest);
-              skinWinnerName=og.players[oIdx]?fname(og.players[oIdx].name):'';
-            } else if(oBest===globalMin) globalMinCount++;
+            if(oBest<globalMin){
+              // another group has lower — this group doesn't lead
+              globalMin=oBest;globalTieCount=oAll.filter(s=>s===oBest).length;
+            } else if(oBest===globalMin){
+              globalTieCount+=oAll.filter(s=>s===oBest).length;
+            }
           }
         });
-        if(best===globalMin&&globalMinCount===0){isSkinLeader=true;skinPlayerName=bestPlayerName;}
+        // Only show skin leader if exactly ONE player across ALL groups has this score
+        if(best===globalMin&&globalTieCount===1&&inGroupTies===1){
+          isSkinLeader=true;skinPlayerName=bestPlayerName;
+        }
 
         // CTP: par 3 only — highest tee time group leads
         if(hole.p===3){
