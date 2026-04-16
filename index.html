@@ -291,7 +291,7 @@ label:first-child{margin-top:0}
       <div style="margin-top:7px"><label style="display:flex;align-items:center;gap:7px;margin:0;font-size:13px"><input type="checkbox" id="p4-sub" onchange="toggleSub(4)" style="width:17px;height:17px"> Sub / Guest?</label>
       <input type="text" id="p4-sn" placeholder="Sub name" style="display:none;margin-top:5px"></div>
     </div>
-    <button class="btn btn-green" id="btn-go" onclick="startScoring()" disabled>Continue to Scoring →</button>
+    <button class="btn btn-green" id="btn-go" onclick="if(!highlightSetupErrors())return;startScoring()" disabled>Continue to Scoring →</button>
     <button class="btn btn-secondary" onclick="goTo('s-home')">Cancel</button>
   </div>
 </div>
@@ -801,6 +801,18 @@ function populateSelects(){
   const opts='<option value="">-- Select --</option>'+all.map(p=>`<option value="${p}">${p}${db.subs.includes(p)?' (sub)':''}</option>`).join('');
   [1,2,3,4].forEach(i=>{const el=document.getElementById('p'+i);if(el)el.innerHTML=opts;});
 }
+function highlightSetupErrors(){
+  const ttEl=document.getElementById('tee-time');
+  if(!ttEl.value){
+    ttEl.style.border='2px solid var(--red)';
+    ttEl.style.background='var(--red-l)';
+    ttEl.addEventListener('change',()=>{ttEl.style.border='';ttEl.style.background='';},{once:true});
+    ttEl.scrollIntoView({behavior:'smooth',block:'center'});
+    showToast('⚠️ Select your tee time position first');
+    return false;
+  }
+  return true;
+}
 function toggleSub(n){
   const cb=document.getElementById(`p${n}-sub`);
   document.getElementById(`p${n}-sn`).style.display=cb.checked?'block':'none';
@@ -949,7 +961,23 @@ function resolveHole(){
   if(hw==='A')ST.awins++;else if(hw==='B')ST.bwins++;
   ST.presses.filter(pr=>!pr.closed).forEach(pr=>{if(hw==='A')pr.awins++;else if(hw==='B')pr.bwins++;});
 }
-function nextHole(){saveCtp();resolveHole();ST.holeIdx++;renderScoringHole();saveLiveProgress();}
+function nextHole(){
+  const db=getDB();const yr=getYear(db);
+  const scoringSide=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
+  const hole=HOLES[scoringSide][ST.holeIdx];
+  if(hole.p===3){
+    const ctpEl=document.getElementById('ctp'+hole.n);
+    if(ctpEl&&!ctpEl.value){
+      ctpEl.style.border='2px solid var(--red)';
+      ctpEl.style.background='var(--red-l)';
+      ctpEl.focus();
+      showToast('⚠️ Select a CTP result before continuing');
+      ctpEl.addEventListener('change',()=>{ctpEl.style.border='';ctpEl.style.background='';},{once:true});
+      return;
+    }
+  }
+  saveCtp();resolveHole();ST.holeIdx++;renderScoringHole();saveLiveProgress();
+}
 function prevHole(){
   const sc=ST.scores[ST.holeIdx-1];
   const ba=Math.min(sc.p0,sc.p1),bb=Math.min(sc.p2,sc.p3);
@@ -1474,23 +1502,68 @@ function renderAdminMoneyLb(){
 function renderCTP(){
   const db=getDB();const yr=getYear(db);
   document.getElementById('ctp-year-pill').textContent=db.activeYear;
-  const ctpMap={};
+
+  // Per-hole: highest tee time with a real CTP winner = winner
+  const holeWinners={};
+  const allCtpByHole={};
+
   yr.weeks.forEach(wd=>{
     Object.entries(wd.ctpWinners||{}).filter(([,v])=>v&&v!=='__HIGHER_TEE__').forEach(([hole,name])=>{
-      if(!ctpMap[name])ctpMap[name]={count:0,holes:[]};
-      ctpMap[name].count++;ctpMap[name].holes.push('H'+hole);
+      if(!allCtpByHole[hole]) allCtpByHole[hole]=[];
+      if(!allCtpByHole[hole].find(e=>e.teeTime===wd.teeTime)){
+        allCtpByHole[hole].push({name,teeTime:wd.teeTime});
+      }
+      if(!holeWinners[hole]||wd.teeTime>holeWinners[hole].teeTime){
+        holeWinners[hole]={name,teeTime:wd.teeTime};
+      }
     });
   });
-  const entries=Object.entries(ctpMap).sort((a,b)=>b[1].count-a[1].count);
-  if(!entries.length){document.getElementById('ctp-list').innerHTML=`<div class="empty-state"><div style="font-size:32px">🎯</div><p>No CTP winners yet.</p></div>`;return;}
-  const rows=entries.map(([n,d],i)=>`<div class="lb-row">
-    <div class="lb-rank${i<3?' top':''}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
-    <div class="lb-name">${n}</div>
-    <div class="lb-stats"><div style="color:var(--gold-d)">${d.count} CTP${d.count!==1?'s':''}</div><div style="font-size:10px;color:var(--text2)">${d.holes.join(', ')}</div></div>
-  </div>`).join('');
-  document.getElementById('ctp-list').innerHTML=`<div class="card">${rows}</div>`;
-}
 
+  const ctpMap={};
+  Object.entries(holeWinners).forEach(([hole,{name}])=>{
+    if(!ctpMap[name])ctpMap[name]={wins:0,holes:[]};
+    ctpMap[name].wins++;ctpMap[name].holes.push('H'+hole);
+  });
+
+  const el=document.getElementById('ctp-list');
+  if(!Object.keys(holeWinners).length){
+    el.innerHTML='<div class="empty-state"><div style="font-size:32px">🎯</div><p>No CTP winners yet.</p></div>';
+    return;
+  }
+
+  const holeRows=Object.keys(allCtpByHole).sort((a,b)=>parseInt(a)-parseInt(b)).map(hole=>{
+    const sorted=[...allCtpByHole[hole]].sort((a,b)=>b.teeTime-a.teeTime);
+    const winner=holeWinners[hole];
+    const rows=sorted.map(e=>{
+      const isWinner=e.teeTime===winner.teeTime;
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
+        +'<span class="tee-badge" style="background:'+(isWinner?'var(--gold)':'var(--gray)')+';width:28px;height:28px;font-size:12px">T'+e.teeTime+'</span>'
+        +'<span style="flex:1;font-size:13px;font-weight:'+(isWinner?700:400)+'">'+e.name+'</span>'
+        +(isWinner?'<span class="badge badge-gold">🏆 Winner</span>':'<span style="font-size:11px;color:var(--text2)">beaten by later tee</span>')
+        +'</div>';
+    }).join('');
+    return '<div class="card" style="margin-bottom:9px">'
+      +'<div class="card-title">Hole '+hole+' — CTP</div>'
+      +rows
+      +'</div>';
+  }).join('');
+
+  const summaryEntries=Object.entries(ctpMap).sort((a,b)=>b[1].wins-a[1].wins);
+  const summaryRows=summaryEntries.map(([n,d],i)=>{
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1;
+    return '<div class="lb-row">'
+      +'<div class="lb-rank'+(i<3?' top':'')+'">'+medal+'</div>'
+      +'<div class="lb-name">'+n+'</div>'
+      +'<div class="lb-stats"><div style="color:var(--gold-d)">'+d.wins+' win'+(d.wins!==1?'s':'')+
+      '</div><div style="font-size:10px;color:var(--text2)">'+d.holes.join(', ')+'</div></div>'
+      +'</div>';
+  }).join('');
+
+  el.innerHTML=
+    '<div style="font-size:11px;color:var(--text2);padding:0 2px 8px">Highest tee time = CTP winner · earlier groups shown for reference</div>'
+    +'<div class="card" style="margin-bottom:12px"><div class="card-title">🏆 CTP Winners Summary</div>'+summaryRows+'</div>'
+    +holeRows;
+}
 // ── HISTORY ──────────────────────────────────────────────────
 function renderHistory(){
   const db=getDB();const yr=getYear(db);
