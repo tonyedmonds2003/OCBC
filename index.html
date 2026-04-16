@@ -832,8 +832,18 @@ function chkSelects(){
 
 // ── START SCORING ────────────────────────────────────────────
 function startScoring(){
+  // Validate tee time — highlight red if missing
+  const ttEl=document.getElementById('tee-time');
+  if(!ttEl.value){
+    ttEl.style.border='2px solid var(--red)';
+    ttEl.style.background='var(--red-l)';
+    ttEl.addEventListener('change',()=>{ttEl.style.border='';ttEl.style.background='';},{once:true});
+    ttEl.scrollIntoView({behavior:'smooth',block:'center'});
+    showToast('⚠️ Select your tee time position first');
+    return;
+  }
   const db=getDB();const yr=getYear(db);
-  ST.teeTime=parseInt(document.getElementById('tee-time').value);
+  ST.teeTime=parseInt(ttEl.value);
   ST.players=[1,2,3,4].map(n=>{
     const isSub=document.getElementById(`p${n}-sub`)?.checked;
     const name=getPVal(n);
@@ -898,7 +908,7 @@ function renderScoringHole(){
       <select id="ctp${hole.n}">
         <option value="">-- Select CTP winner --</option>
         ${ST.players.map(pl=>`<option value="${pl.name}"${pl.name===cur?' selected':''}>${pl.name}</option>`).join('')}
-        <option value="__HIGHER_TEE__"${cur==='__HIGHER_TEE__'?' selected':''}>Later tee time group wins</option>
+        <option value="__HIGHER_TEE__"${cur==='__HIGHER_TEE__'?' selected':''}>No one in our Group</option>
       </select>
       <p style="font-size:11px;color:var(--text2);margin-top:4px">If a later tee time beats your best, select "Later tee time group wins"</p>
     </div>`;
@@ -1210,20 +1220,27 @@ function renderLiveScoring(liveGroups, completedRounds){
           isSkinLeader=true;skinPlayerName=bestPlayerName;
         }
 
-        // CTP: par 3 only — highest tee time group leads
+        // CTP: par 3 only — highest tee time that picked a REAL player name wins
+        // In-progress live groups are excluded (ctpWinners only exists on completed rounds)
         if(hole.p===3){
           let highestTeeCTP=0;
+          let highestTeeCtpPlayer='';
+          // Only look at completed rounds that recorded a real CTP winner for this hole
           Object.values(allGroups).forEach(og=>{
-            const oHolesPlayed=og.status==='complete'?9:Math.min(og.holeIdx,8);
-            if(hi<oHolesPlayed&&og.scores[hi]&&og.teeTime>highestTeeCTP){
+            if(og.status!=='complete') return; // skip in-progress
+            // Find this group's completed round data
+            const wd=completedRounds.find(w=>w.teeTime===og.teeTime);
+            if(!wd) return;
+            const ctpWinner=wd.ctpWinners&&wd.ctpWinners[hole.n];
+            // Must be a real player name — not blank, not __HIGHER_TEE__
+            if(ctpWinner&&ctpWinner!==''&&ctpWinner!=='__HIGHER_TEE__'&&og.teeTime>highestTeeCTP){
               highestTeeCTP=og.teeTime;
+              highestTeeCtpPlayer=ctpWinner;
             }
           });
-          if(grp.teeTime===highestTeeCTP){
+          if(highestTeeCTP>0&&grp.teeTime===highestTeeCTP){
             isCtpLeader=true;
-            // Find closest player (lowest score) in this group on this par 3
-            const ctpIdx=playerScores.indexOf(best);
-            ctpPlayerName=grp.players[ctpIdx]?fname(grp.players[ctpIdx].name):'';
+            ctpPlayerName=fname(highestTeeCtpPlayer);
           }
         }
       }
