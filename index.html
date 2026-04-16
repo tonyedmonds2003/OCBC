@@ -156,6 +156,23 @@ label:first-child{margin-top:0}
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--gray-d);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center}
 .toast.show{opacity:1}
 .empty-state{text-align:center;padding:36px 20px;color:var(--text2)}
+.live-card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);padding:11px;margin-bottom:9px;position:relative}
+.live-card.in-progress{border-color:var(--red);border-width:2px}
+.live-card.complete{border-color:var(--green)}
+.live-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px}
+.live-badge.active{background:var(--red-l);color:var(--red)}
+.live-badge.done{background:var(--green-l);color:var(--green-d)}
+.live-score-row{display:flex;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
+.live-score-row:last-child{border-bottom:none}
+.live-hole-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:2px;margin-top:8px}
+.live-hole-cell{text-align:center;font-size:10px;padding:3px 1px;border-radius:3px}
+.live-hole-cell.played{background:var(--bg)}
+.live-hole-cell.eagle{background:#7F77DD;color:#fff;font-weight:700}
+.live-hole-cell.birdie{background:var(--blue-l);color:var(--blue-d);font-weight:700}
+.live-hole-cell.par-score{background:var(--white)}
+.live-hole-cell.bogey{background:var(--gold-l);color:var(--gold-d)}
+.live-hole-cell.double{background:var(--red-l);color:var(--red)}
+.live-hole-cell.current{border:1.5px solid var(--navy);font-weight:700}
 .year-pill{display:inline-flex;align-items:center;gap:5px;background:var(--navy-l);color:var(--navy);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
 .tee-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;flex-shrink:0}
 .setup-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;font-size:13px;line-height:1.5}
@@ -325,9 +342,9 @@ label:first-child{margin-top:0}
   <!-- LEADERBOARD TAB -->
   <div id="tab-leaderboard" class="tab-content active">
     <div style="padding:9px 15px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <button onclick="setLb('money')" id="lbb-money" class="badge badge-green" style="cursor:pointer;font-size:11px;padding:5px 12px">💰 Money</button>
-      <button onclick="setLb('avg')" id="lbb-avg" class="badge" style="cursor:pointer;font-size:11px;padding:5px 12px;background:var(--gray-l);color:var(--gray-d)">📈 Avg</button>
+      <button onclick="setLb('avg')" id="lbb-avg" class="badge badge-blue" style="cursor:pointer;font-size:11px;padding:5px 12px">📈 Avg Score</button>
       <button onclick="setLb('wins')" id="lbb-wins" class="badge" style="cursor:pointer;font-size:11px;padding:5px 12px;background:var(--gray-l);color:var(--gray-d)">🏆 Wins</button>
+      <button onclick="setLb('hot')" id="lbb-hot" class="badge" style="cursor:pointer;font-size:11px;padding:5px 12px;background:var(--gray-l);color:var(--gray-d)">🔥 Hot Streak</button>
       <span id="lb-year-pill" class="year-pill" style="margin-left:auto"></span>
     </div>
     <div class="section" id="lb-list"></div>
@@ -340,6 +357,19 @@ label:first-child{margin-top:0}
     </div>
     <div class="section" id="hist-list"></div>
   </div>
+  <!-- LIVE SCORING TAB -->
+  <div id="tab-live" class="tab-content">
+    <div style="padding:9px 15px 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:7px">
+        <div id="live-dot" style="width:8px;height:8px;border-radius:50%;background:var(--red);animation:pulse 1.2s infinite"></div>
+        <span style="font-size:13px;font-weight:600;color:var(--red)">LIVE</span>
+        <span style="font-size:11px;color:var(--text2)" id="live-refresh-time"></span>
+      </div>
+      <button class="refresh-btn" onclick="refreshLive()">⟳ Refresh</button>
+    </div>
+    <div class="section" id="live-list"></div>
+  </div>
+
   <!-- CTP TAB -->
   <div id="tab-ctp" class="tab-content">
     <div style="padding:9px 15px 0;display:flex;align-items:center;justify-content:space-between">
@@ -420,6 +450,12 @@ label:first-child{margin-top:0}
 
       <!-- Danger -->
       <div class="card">
+        <div class="card-title">🏆 Settle This Week's Skins &amp; CTP</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Use this if not all 9 groups submitted but you want to finalize skins and CTP payouts for the current week.</p>
+        <button class="btn btn-gold" onclick="adminSettleSkinsCTP()">Settle Skins &amp; CTP Now</button>
+      </div>
+
+      <div class="card">
         <div class="card-title">⛅ Rainout Week</div>
         <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Mark the current week as a rainout — no scores, week still counts toward the season.</p>
         <button class="btn btn-secondary" onclick="markRainout()">Mark This Week as Rainout</button>
@@ -447,6 +483,12 @@ label:first-child{margin-top:0}
       </div>
 
       <div class="card">
+        <div class="card-title">💰 Season Money Leaderboard</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Visible to commissioner only — not shown on the public leaderboard.</p>
+        <div id="admin-money-lb"></div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Danger Zone</div>
         <button class="btn btn-danger" onclick="doConfirm('Reset scores for the current year? Player roster is kept.', resetSeason)">Reset Current Year Data</button>
       </div>
@@ -469,6 +511,10 @@ label:first-child{margin-top:0}
   <button class="bnav-btn" id="nb-history" onclick="showTab('history')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <span>History</span>
+  </button>
+  <button class="bnav-btn" id="nb-live" onclick="showTab('live')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <span>Live</span>
   </button>
   <button class="bnav-btn" id="nb-ctp" onclick="showTab('ctp')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
@@ -574,7 +620,7 @@ function isRainoutWeek(yr){
 
 // ── STATE ────────────────────────────────────────────────────
 let ST={players:[],holeIdx:0,scores:[],ctpWinners:{},teeTime:1,presses:[],awins:0,bwins:0};
-let lbMode='money';
+let lbMode='avg';
 
 // ── INIT ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
@@ -880,7 +926,7 @@ function resolveHole(){
   if(hw==='A')ST.awins++;else if(hw==='B')ST.bwins++;
   ST.presses.filter(pr=>!pr.closed).forEach(pr=>{if(hw==='A')pr.awins++;else if(hw==='B')pr.bwins++;});
 }
-function nextHole(){saveCtp();resolveHole();ST.holeIdx++;renderScoringHole();}
+function nextHole(){saveCtp();resolveHole();ST.holeIdx++;renderScoringHole();saveLiveProgress();}
 function prevHole(){
   const sc=ST.scores[ST.holeIdx-1];
   const ba=Math.min(sc.p0,sc.p1),bb=Math.min(sc.p2,sc.p3);
@@ -893,7 +939,9 @@ function finishRound(){saveCtp();resolveHole();calcResults();}
 // ── CALC ─────────────────────────────────────────────────────
 function calcResults(){
   const db=getDB();const yr=getYear(db);
-  const holes=HOLES[yr.currentSide];
+  const side=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  const holes=HOLES[side];
   const names=ST.players.map(p=>p.name);
 
   ST.presses.forEach(pr=>{if(!pr.closed){pr.closed=true;pr.winner=pr.awins>pr.bwins?'A':pr.bwins>pr.awins?'B':null;}});
@@ -905,16 +953,7 @@ function calcResults(){
     return{hole,sc,ba,bb,w};
   });
 
-  const skins={};
-  holes.forEach((hole,i)=>{
-    const sc=ST.scores[i];const all=[sc.p0,sc.p1,sc.p2,sc.p3];const mn=Math.min(...all);
-    if(all.filter(s=>s===mn).length===1) skins[hole.n]=names[all.indexOf(mn)];
-  });
-  const skinCnt=Object.keys(skins).length;
-  const skinPay=skinCnt>0?(180/skinCnt):0;
-  const par3s=holes.filter(h=>h.p===3);
-  const ctpPay=36;
-
+  // Best ball + presses pay immediately per foursome
   const money={};names.forEach(n=>money[n]=0);
   const mw=ST.awins>ST.bwins?'A':ST.bwins>ST.awins?'B':null;
   if(mw==='A'){money[names[0]]+=5;money[names[1]]+=5;money[names[2]]-=5;money[names[3]]-=5;}
@@ -923,32 +962,259 @@ function calcResults(){
     if(pr.winner==='A'){money[names[0]]+=10;money[names[1]]+=10;money[names[2]]-=10;money[names[3]]-=10;}
     else if(pr.winner==='B'){money[names[2]]+=10;money[names[3]]+=10;money[names[0]]-=10;money[names[1]]-=10;}
   });
-  Object.values(skins).forEach(n=>{money[n]=(money[n]||0)+skinPay;});
-  Object.values(ST.ctpWinners).filter(v=>v&&v!=='__HIGHER_TEE__').forEach(n=>{if(money[n]!==undefined)money[n]+=ctpPay;});
 
-  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
-  const side=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
+  // Skins + CTP are league-wide — pending until all 9 tee times submit
   const wd={
     week:wk,side:side,year:db.activeYear,
     date:new Date().toLocaleDateString(),teeTime:ST.teeTime,
     players:ST.players.map(p=>({name:p.name,isSub:p.isSub})),
     scores:JSON.parse(JSON.stringify(ST.scores)),
-    skins,ctpWinners:JSON.parse(JSON.stringify(ST.ctpWinners)),
+    ctpWinners:JSON.parse(JSON.stringify(ST.ctpWinners)),
     money,awins:ST.awins,bwins:ST.bwins,matchWinner:mw,
-    presses:JSON.parse(JSON.stringify(ST.presses))
+    presses:JSON.parse(JSON.stringify(ST.presses)),
+    skinsSettled:false,skins:{},skinPay:0,ctpPay:0,leagueCTP:{}
   };
 
+  // Remove any existing entry for this week+teeTime (resubmit)
+  yr.weeks=yr.weeks.filter(w=>!(w.week===wk&&w.teeTime===ST.teeTime));
   yr.weeks.push(wd);
-  // Week/side now driven by date — no manual advance needed
   saveDB(db);
-  syncToSheet(wd);
-  renderResults(wd,hres,skins,skinPay,ctpPay);
+
+  // Check if all 9 tee times submitted
+  const thisWeekRounds=yr.weeks.filter(w=>w.week===wk&&w.side===side);
+  const allIn=thisWeekRounds.length>=9;
+  if(allIn) calcLeagueWideSkinsCTP(db,yr,wk,side);
+
+  const savedWd=yr.weeks.find(w=>w.week===wk&&w.teeTime===ST.teeTime)||wd;
+  syncToSheet(savedWd);
+  renderResults(savedWd,hres,savedWd.skins||{},savedWd.skinPay||0,savedWd.ctpPay||0,allIn,savedWd.leagueCTP||{});
   renderHome();renderLb();renderHistory();renderCTP();
   goTo('s-results');
 }
 
+// ── LIVE SCORING ─────────────────────────────────────────────
+let _liveRefreshTimer=null;
+
+async function saveLiveProgress(){
+  const db=getDB();if(!db.sheetUrl)return;
+  const yr=getYear(db);
+  const side=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  const liveData={
+    type:'live',
+    week:wk,side:side,year:db.activeYear,
+    teeTime:ST.holeIdx===-1?null:ST.teeTime,
+    holeIdx:ST.holeIdx,
+    players:ST.players.map(p=>({name:p.name,isSub:p.isSub})),
+    scores:JSON.parse(JSON.stringify(ST.scores)),
+    awins:ST.awins,bwins:ST.bwins,
+    timestamp:Date.now()
+  };
+  try{
+    await fetch(db.sheetUrl,{method:'POST',body:JSON.stringify({action:'saveLive',data:liveData})});
+  }catch(e){}
+}
+
+async function fetchLiveData(){
+  const db=getDB();if(!db.sheetUrl)return null;
+  const yr=getYear(db);
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  try{
+    const r=await fetch(db.sheetUrl+'?action=getLive&year='+db.activeYear+'&week='+wk);
+    const d=await r.json();
+    return d.ok?d.live:null;
+  }catch(e){return null;}
+}
+
+async function refreshLive(){
+  document.getElementById('live-refresh-time').textContent='Refreshing...';
+  const live=await fetchLiveData();
+  const db=getDB();const yr=getYear(db);
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  const completedRounds=yr.weeks.filter(w=>w.week===wk);
+  renderLiveScoring(live||[], completedRounds);
+  const now=new Date();
+  document.getElementById('live-refresh-time').textContent=
+    `Updated ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+
+function startLiveAutoRefresh(){
+  if(_liveRefreshTimer)clearInterval(_liveRefreshTimer);
+  refreshLive();
+  _liveRefreshTimer=setInterval(()=>{
+    const liveTab=document.getElementById('tab-live');
+    if(liveTab&&liveTab.classList.contains('active'))refreshLive();
+  },60000);
+}
+
+function stopLiveAutoRefresh(){
+  if(_liveRefreshTimer){clearInterval(_liveRefreshTimer);_liveRefreshTimer=null;}
+}
+
+function renderLiveScoring(liveGroups, completedRounds){
+  const db=getDB();const yr=getYear(db);
+  const side=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
+  const holes=HOLES[side];
+  const el=document.getElementById('live-list');
+  if(!el)return;
+
+  // Merge live + completed into one list per tee time
+  const allGroups={};
+
+  // Add completed rounds
+  completedRounds.forEach(wd=>{
+    allGroups[wd.teeTime]={
+      teeTime:wd.teeTime,status:'complete',
+      players:wd.players,scores:wd.scores,
+      awins:wd.awins,bwins:wd.bwins,
+      holeIdx:8,timestamp:0
+    };
+  });
+
+  // Add/override with live data
+  (liveGroups||[]).forEach(lg=>{
+    // Skip if already completed
+    if(allGroups[lg.teeTime]&&allGroups[lg.teeTime].status==='complete')return;
+    allGroups[lg.teeTime]={
+      teeTime:lg.teeTime,status:'live',
+      players:lg.players,scores:lg.scores,
+      awins:lg.awins,bwins:lg.bwins,
+      holeIdx:lg.holeIdx,timestamp:lg.timestamp
+    };
+  });
+
+  const sorted=Object.values(allGroups).sort((a,b)=>a.teeTime-b.teeTime);
+
+  if(!sorted.length){
+    el.innerHTML=`<div class="empty-state"><div style="font-size:32px">🏌️</div><p>No groups on the course yet.</p><p style="font-size:12px;margin-top:6px">Scores appear here as foursomes play.</p></div>`;
+    return;
+  }
+
+  const html=sorted.map(grp=>{
+    const isLive=grp.status==='live';
+    const isDone=grp.status==='complete';
+    const currentHole=Math.min(grp.holeIdx,8);
+    const holesPlayed=isLive?currentHole:9;
+
+    // Player totals so far
+    const playerRows=grp.players.map((pl,i)=>{
+      const tot=grp.scores.slice(0,holesPlayed+(isLive?0:9)).reduce((s,sc)=>s+(sc['p'+i]||0),0);
+      const parSoFar=holes.slice(0,holesPlayed).reduce((s,h)=>s+h.p,0);
+      const diff=tot-parSoFar;
+      const diffStr=diff===0?'E':diff>0?`+${diff}`:diff;
+      const diffColor=diff<0?'var(--blue-d)':diff===0?'var(--text)':'var(--red)';
+      return`<div class="live-score-row">
+        <div style="flex:1">${pl.name}${pl.isSub?'<span class="lb-sub">S</span>':''}</div>
+        <div style="font-weight:700;min-width:28px;text-align:center">${tot}</div>
+        <div style="min-width:36px;text-align:right;color:${diffColor};font-size:12px">${diffStr}</div>
+      </div>`;
+    }).join('');
+
+    // Mini hole grid
+    const holeGrid=holes.map((hole,hi)=>{
+      if(hi>=holesPlayed&&isLive) return`<div class="live-hole-cell" style="color:var(--border)">·</div>`;
+      // Best ball score for this hole
+      const sc=grp.scores[hi];
+      if(!sc)return`<div class="live-hole-cell">·</div>`;
+      const best=Math.min(sc.p0,sc.p1,sc.p2,sc.p3);
+      const diff=best-hole.p;
+      const cls=diff<=-2?'eagle':diff===-1?'birdie':diff===0?'par-score':diff===1?'bogey':'double';
+      const isCur=isLive&&hi===currentHole;
+      return`<div class="live-hole-cell ${cls}${isCur?' current':''}">${best}</div>`;
+    }).join('');
+
+    const holeLabel=isLive?`Hole ${holes[currentHole]?.n} of ${holes[holes.length-1].n}`:'Complete ✓';
+    const timeAgo=isLive&&grp.timestamp?`${Math.round((Date.now()-grp.timestamp)/60000)}m ago`:'';
+
+    return`<div class="live-card ${isLive?'in-progress':isDone?'complete':''}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:7px">
+          <span class="tee-badge">${grp.teeTime}</span>
+          <span style="font-size:13px;font-weight:600">${grp.players.map(p=>fname(p.name)).join(' / ')}</span>
+        </div>
+        <span class="live-badge ${isLive?'active':'done'}">${isLive?`🟢 ${holeLabel}`:'✅ Done'}</span>
+      </div>
+      ${playerRows}
+      <div style="margin-top:8px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:3px">
+          ${holes.map(h=>`<div style="text-align:center;flex:1">H${h.n}</div>`).join('')}
+        </div>
+        <div class="live-hole-grid">${holeGrid}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:var(--text2)">
+        <span>Match: A ${grp.awins||0} — B ${grp.bwins||0}</span>
+        ${timeAgo?`<span>${timeAgo}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=html;
+}
+
+function calcLeagueWideSkinsCTP(db,yr,wk,side){
+  const holes=HOLES[side];
+  const weekRounds=yr.weeks.filter(w=>w.week===wk&&w.side===side);
+
+  // All individual scores across all 36 players, per hole
+  const holeScores={};
+  holes.forEach(h=>holeScores[h.n]=[]);
+  weekRounds.forEach(wd=>{
+    wd.players.forEach((pl,i)=>{
+      wd.scores.forEach((sc,hi)=>{
+        holeScores[holes[hi].n].push({name:pl.name,score:sc['p'+i]||0});
+      });
+    });
+  });
+
+  // Skins: low score across ALL 36 — any tie = no skin
+  const leagueSkins={};
+  holes.forEach(hole=>{
+    const entries=holeScores[hole.n];
+    if(!entries.length)return;
+    const mn=Math.min(...entries.map(e=>e.score));
+    const winners=entries.filter(e=>e.score===mn);
+    if(winners.length===1)leagueSkins[hole.n]=winners[0].name;
+  });
+  const skinCnt=Object.keys(leagueSkins).length;
+  const skinPay=skinCnt>0?(180/skinCnt):0;
+
+  // CTP: highest tee time that recorded a real winner per par 3
+  const par3s=holes.filter(h=>h.p===3);
+  const ctpPay=36;
+  const leagueCTP={};
+  par3s.forEach(h=>{
+    let bestTee=0,bestName='';
+    weekRounds.forEach(wd=>{
+      const winner=wd.ctpWinners[h.n];
+      if(winner&&winner!=='__HIGHER_TEE__'&&wd.teeTime>bestTee){
+        bestTee=wd.teeTime;bestName=winner;
+      }
+    });
+    if(bestName)leagueCTP[h.n]=bestName;
+  });
+
+  // Apply skins+CTP money to each round
+  weekRounds.forEach(wd=>{
+    wd.skins=leagueSkins;
+    wd.skinPay=skinPay;
+    wd.ctpPay=ctpPay;
+    wd.leagueCTP=leagueCTP;
+    wd.skinsSettled=true;
+    Object.values(leagueSkins).forEach(name=>{
+      if(wd.money[name]!==undefined)wd.money[name]+=skinPay;
+    });
+    Object.values(leagueCTP).forEach(name=>{
+      if(wd.money[name]!==undefined)wd.money[name]+=ctpPay;
+    });
+  });
+
+  saveDB(db);
+  showToast('All 9 groups in! Skins & CTP settled 🏆');
+}
+
 // ── RESULTS ──────────────────────────────────────────────────
-function renderResults(wd,hres,skins,skinPay,ctpPay){
+function renderResults(wd,hres,skins,skinPay,ctpPay,allIn,leagueCTP){
+  const _db=getDB();const yr=_db?getYear(_db):null;
   const names=wd.players.map(p=>p.name);
   document.getElementById('res-sub').textContent=`Week ${wd.week} · ${wd.side==='front'?'Front 9':'Back 9'} · Tee ${wd.teeTime} · ${wd.date}`;
   const mLabel=wd.matchWinner==='A'?`${names[0]} / ${names[1]} win!`:wd.matchWinner==='B'?`${names[2]} / ${names[3]} win!`:'Match tied!';
@@ -963,10 +1229,10 @@ function renderResults(wd,hres,skins,skinPay,ctpPay){
   }
 
   const skinRows=Object.entries(skins).map(([h,n])=>`<div class="payout-row"><span>Hole ${h} — ${n}</span><span class="payout-amt">+$${skinPay.toFixed(2)}</span></div>`).join('');
-  const ctpRows=Object.entries(wd.ctpWinners).filter(([,v])=>v&&v!=='__HIGHER_TEE__').map(([h,n])=>
-    `<div class="payout-row"><span>Hole ${h} — ${n}</span><span class="payout-amt">+$${ctpPay.toFixed(2)}</span></div>`).join('')+
-    Object.entries(wd.ctpWinners).filter(([,v])=>v==='__HIGHER_TEE__').map(([h])=>
-    `<div class="payout-row"><span>Hole ${h} — Later tee time wins</span><span style="font-size:11px;color:var(--text2)">recorded by that group</span></div>`).join('');
+  const ctpSource=leagueCTP&&Object.keys(leagueCTP).length?leagueCTP:
+    Object.fromEntries(Object.entries(wd.ctpWinners).filter(([,v])=>v&&v!=='__HIGHER_TEE__'));
+  const ctpRows=Object.entries(ctpSource).map(([h,n])=>
+    `<div class="payout-row"><span>Hole ${h} — ${n}</span><span class="payout-amt">+$${ctpPay.toFixed(2)}</span></div>`).join('');
   const payRows=wd.players.map(pl=>{
     const m=wd.money[pl.name]||0;
     return`<div class="payout-row"><span>${pl.name}${pl.isSub?'<span class="lb-sub">S</span>':''}</span><span style="font-weight:700;color:${m>0?'var(--green-d)':m<0?'var(--red)':'var(--text2)'}">${m>0?'+':''}$${m.toFixed(2)}</span></div>`;
@@ -989,8 +1255,15 @@ function renderResults(wd,hres,skins,skinPay,ctpPay){
       ${wd.matchWinner?`<div style="text-align:center;border-top:1px solid var(--border);padding-top:7px"><div style="font-size:12px;color:var(--text2)">Match payout</div><div style="font-size:24px;font-weight:700;color:var(--green)">+$5.00/man</div></div>`:''}
     </div>
     ${wd.presses&&wd.presses.length?`<div class="card"><div class="card-title">Presses (${wd.presses.length})</div>${pressRows}</div>`:''}
-    <div class="card"><div class="card-title">Skins — $180 · ${Object.keys(skins).length} skin${Object.keys(skins).length!==1?'s':''}</div>${skinRows||'<div style="color:var(--text2);font-size:13px">No skins this round</div>'}</div>
-    <div class="card"><div class="card-title">Closest to the Pin</div>${ctpRows||'<div style="color:var(--text2);font-size:13px">None recorded</div>'}</div>
+    ${!wd.skinsSettled&&!allIn?
+      `<div class="card" style="background:var(--gold-l);border-color:var(--gold)">
+        <div class="card-title" style="color:var(--gold-d)">⏳ Skins &amp; CTP — Pending</div>
+        <div style="font-size:13px;color:var(--gold-d)">Skins and CTP are calculated league-wide once all 9 foursomes have submitted. <strong>${9-(yr?yr.weeks.filter(w=>w.week===wd.week).length:1)} group${9-(yr?yr.weeks.filter(w=>w.week===wd.week).length:1)!==1?'s':''} still to go.</strong></div>
+      </div>`
+    :
+      `<div class="card"><div class="card-title">Skins — $180 league-wide · ${Object.keys(skins).length} skin${Object.keys(skins).length!==1?'s':''}</div>${skinRows||'<div style="color:var(--text2);font-size:13px">No skins won — all holes tied across the league</div>'}</div>
+      <div class="card"><div class="card-title">Closest to the Pin — League-wide</div>${ctpRows||'<div style="color:var(--text2);font-size:13px">None recorded</div>'}</div>`
+    }
     <div class="card"><div class="card-title">Payout Summary</div>${payRows}</div>
     <div class="card">
       <div class="card-title">Scorecard</div>
@@ -1014,9 +1287,10 @@ function renderResults(wd,hres,skins,skinPay,ctpPay){
 // ── LEADERBOARD ──────────────────────────────────────────────
 function setLb(m){
   lbMode=m;
-  ['money','avg','wins'].forEach(t=>{
-    const b=document.getElementById('lbb-'+t);const on=t===m;
-    b.className='badge '+(on?t==='money'?'badge-green':t==='avg'?'badge-blue':'badge-gold':'');
+  ['avg','wins','hot'].forEach(t=>{
+    const b=document.getElementById('lbb-'+t);if(!b)return;
+    const on=t===m;
+    b.className='badge '+(on?t==='avg'?'badge-blue':t==='wins'?'badge-gold':'badge-red':'');
     if(!on){b.style.background='var(--gray-l)';b.style.color='var(--gray-d)';}else{b.style.background='';b.style.color='';}
   });
   renderLb();
@@ -1029,7 +1303,7 @@ function buildStats(yr_data){
       const n=pl.name;
       if(!stats[n])stats[n]={money:0,scores:[],wins:0,skins:0,ctps:0,pressWins:0,isSub:pl.isSub};
       stats[n].scores.push({week:wd.week,score:wd.scores.reduce((s,sc)=>s+(sc['p'+i]||0),0)});
-      stats[n].money+=(wd.money[n]||0);
+      stats[n].money+=(wd.money[n]||0); // includes skins/CTP after settlement
     });
     const wt=wd.matchWinner;
     if(wt){[wt==='A'?0:2,wt==='A'?1:3].forEach(i=>{const n=wd.players[i].name;if(stats[n])stats[n].wins++;});}
@@ -1054,20 +1328,29 @@ function renderLb(){
   const played=Object.keys(stats).filter(n=>stats[n].scores.length>0);
   if(!played.length){document.getElementById('lb-list').innerHTML=`<div class="empty-state"><div style="font-size:32px">📊</div><p>No rounds yet.</p></div>`;return;}
   let sorted;
-  if(lbMode==='money')sorted=[...played].sort((a,b)=>stats[b].money-stats[a].money);
-  else if(lbMode==='avg')sorted=[...played].sort((a,b)=>parseFloat(seasAvg(stats[a].scores))-parseFloat(seasAvg(stats[b].scores)));
+  if(lbMode==='avg')sorted=[...played].sort((a,b)=>parseFloat(seasAvg(stats[a].scores)||99)-parseFloat(seasAvg(stats[b].scores)||99));
+  else if(lbMode==='hot')sorted=[...played].filter(n=>stats[n].scores.length>=2).sort((a,b)=>parseFloat(rolling4(stats[a].scores)||99)-parseFloat(rolling4(stats[b].scores)||99));
   else sorted=[...played].sort((a,b)=>stats[b].wins-stats[a].wins);
+
   const rows=sorted.map((n,i)=>{
     const s=stats[n];const r4=rolling4(s.scores);const sa=seasAvg(s.scores);const hot=isHot(s.scores);
     let right='';
-    if(lbMode==='money'){
-      right=`<div class="lb-stats"><div style="color:${s.money>=0?'var(--green-d)':'var(--red)'}">${s.money>=0?'+':''}$${s.money.toFixed(2)}</div>
-        ${r4?`<div class="avg-row"><span class="avg-chip" style="background:var(--blue-l);color:var(--blue-d)">R4:${r4}</span><span class="avg-chip" style="background:var(--gray-l);color:var(--gray-d)">Avg:${sa}</span></div>`:''}
+    if(lbMode==='avg'){
+      right=`<div class="lb-stats">
+        <div class="avg-row"><span class="avg-chip" style="background:var(--blue-l);color:var(--blue-d)">R4:${r4||'—'}</span><span class="avg-chip" style="background:var(--gray-l);color:var(--gray-d)">Avg:${sa}</span></div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">${s.scores.length} round${s.scores.length!==1?'s':''}</div>
       </div>`;
-    } else if(lbMode==='avg'){
-      right=`<div class="lb-stats"><div class="avg-row"><span class="avg-chip" style="background:var(--blue-l);color:var(--blue-d)">R4:${r4||'—'}</span><span class="avg-chip" style="background:var(--gray-l);color:var(--gray-d)">Avg:${sa}</span></div><div style="font-size:10px;color:var(--text2);margin-top:2px">${s.scores.length} rounds</div></div>`;
+    } else if(lbMode==='hot'){
+      const diff=r4&&sa?(parseFloat(sa)-parseFloat(r4)).toFixed(1):null;
+      right=`<div class="lb-stats">
+        <div style="color:${hot?'var(--red)':'var(--text2)'}"><span class="avg-chip" style="background:var(--red-l);color:var(--red)">R4:${r4||'—'}</span></div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">${diff&&diff>0?`${diff} better than avg`:diff===null?'':diff<=0?'On pace':''}</div>
+      </div>`;
     } else {
-      right=`<div class="lb-stats"><div>${s.wins}W / ${s.skins}S</div><div style="font-size:10px;color:var(--text2)">${s.ctps} CTP · ${s.pressWins} press W</div></div>`;
+      right=`<div class="lb-stats">
+        <div>${s.wins}W / ${s.skins}S / ${s.ctps}C</div>
+        <div style="font-size:10px;color:var(--text2)">${s.pressWins} press win${s.pressWins!==1?'s':''}</div>
+      </div>`;
     }
     return`<div class="lb-row">
       <div class="lb-rank${i<3?' top':''}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
@@ -1075,7 +1358,28 @@ function renderLb(){
       ${right}
     </div>`;
   }).join('');
-  document.getElementById('lb-list').innerHTML=`<div style="font-size:11px;color:var(--text2);margin-bottom:7px">R4 = last 4 weeks · Avg = season · 🔥 = hot streak</div><div class="card">${rows}</div>`;
+  document.getElementById('lb-list').innerHTML=`<div style="font-size:11px;color:var(--text2);margin-bottom:7px">R4 = last 4 weeks · Avg = season · 🔥 = hot streak (R4 lower than avg)</div><div class="card">${rows||'<div style="color:var(--text2);padding:10px">Not enough data yet</div>'}</div>`;
+}
+
+// ── ADMIN MONEY LEADERBOARD (commissioner only) ──────────────
+function renderAdminMoneyLb(){
+  const db=getDB();const yr=getYear(db);
+  const el=document.getElementById('admin-money-lb');
+  if(!el)return;
+  const stats=buildStats(yr);
+  const played=Object.keys(stats).filter(n=>stats[n].scores.length>0);
+  if(!played.length){el.innerHTML='<div style="color:var(--text2);font-size:13px">No rounds yet.</div>';return;}
+  const sorted=[...played].sort((a,b)=>stats[b].money-stats[a].money);
+  const rows=sorted.map((n,i)=>{
+    const s=stats[n];const m=s.money;
+    const color=m>0?'var(--green-d)':m<0?'var(--red)':'var(--text2)';
+    return`<div class="lb-row">
+      <div class="lb-rank${i<3?' top':''}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
+      <div class="lb-name">${n}${s.isSub?'<span class="lb-sub">SUB</span>':''}</div>
+      <div class="lb-stats" style="color:${color};font-size:14px">${m>=0?'+':''}$${m.toFixed(2)}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML=`<div class="card" style="padding:8px 12px">${rows}</div>`;
 }
 
 // ── CTP LEADERBOARD ──────────────────────────────────────────
@@ -1258,6 +1562,19 @@ function resetSeason(){
   saveDB(db);renderHome();renderLb();renderHistory();renderCTP();syncAdminUI();showToast('Season reset');
 }
 
+function adminSettleSkinsCTP(){
+  const db=getDB();const yr=getYear(db);
+  const side=yr.seasonStartDate?calcCurrentSide(yr):yr.currentSide;
+  const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
+  const rounds=yr.weeks.filter(w=>w.week===wk&&w.side===side);
+  if(!rounds.length){showToast('No rounds submitted for this week yet');return;}
+  doConfirm(`Settle skins & CTP for Week ${wk} with ${rounds.length} of 9 groups submitted?`,()=>{
+    calcLeagueWideSkinsCTP(db,yr,wk,side);
+    renderAdminMoneyLb();renderLb();
+    showToast(`Week ${wk} skins & CTP settled with ${rounds.length} groups`);
+  });
+}
+
 function markRainout(){
   const db=getDB();const yr=getYear(db);
   const wk=yr.seasonStartDate?calcCurrentWeek(yr):yr.currentWeek;
@@ -1332,17 +1649,18 @@ function showTab(t){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('s-tabs').classList.add('active');
   document.getElementById('bnav').style.display='flex';
-  ['leaderboard','history','ctp','admin'].forEach(x=>{
+  ['leaderboard','history','live','ctp','admin'].forEach(x=>{
     document.getElementById('tab-'+x).classList.toggle('active',x===t);
     const nb=document.getElementById('nb-'+x);if(nb)nb.classList.toggle('active',x===t);
   });
-  const T={leaderboard:'Leaderboard',history:'Season History',ctp:'CTP Leaders',admin:'Admin Settings'};
-  const S={leaderboard:'Scores, averages & hot streaks',history:'All rounds played',ctp:'Closest to the pin leaders',admin:'Commissioner access'};
+  const T={leaderboard:'Leaderboard',history:'Season History',live:'Live Scoring',ctp:'CTP Leaders',admin:'Admin Settings'};
+  const S={leaderboard:'Scores, averages & hot streaks',history:'All rounds played',live:'Live hole-by-hole · updates every 60s',ctp:'Closest to the pin leaders',admin:'Commissioner access'};
   document.getElementById('tab-title').textContent=T[t];document.getElementById('tab-sub').textContent=S[t];
+  if(t==='live'){startLiveAutoRefresh();}else{stopLiveAutoRefresh();}
   if(t==='leaderboard')renderLb();
   if(t==='history')renderHistory();
   if(t==='ctp')renderCTP();
-  if(t==='admin'){renderPlayers();syncAdminUI();}
+  if(t==='admin'){renderPlayers();syncAdminUI();renderAdminMoneyLb();}
   window.scrollTo(0,0);
 }
 function hideBnav(){document.getElementById('bnav').style.display='none';}
