@@ -733,6 +733,14 @@ async function loadFromSheet(url, year){
     if(d.config){
       if(d.config.currentWeek) yr.currentWeek=parseInt(d.config.currentWeek);
       if(d.config.currentSide) yr.currentSide=d.config.currentSide;
+      // Pick up side override set by commissioner
+      const wk=calcCurrentWeek(yr);
+      const overrideKey='sideOverride_'+db.activeYear+'_wk'+wk;
+      if(d.config[overrideKey]){
+        yr.sideOverride=d.config[overrideKey];
+      } else {
+        yr.sideOverride=null; // clear any old override
+      }
       // Roster: sheet is source of truth if it has players defined
       if(d.config.players){
         try{
@@ -744,6 +752,14 @@ async function loadFromSheet(url, year){
         try{
           const sl=typeof d.config.subs==='string'?JSON.parse(d.config.subs):d.config.subs;
           if(Array.isArray(sl)) db.subs=sl;
+        }catch(e){}
+      }
+      // Pick up rainouts set by commissioner
+      const rainoutKey='rainouts_'+db.activeYear;
+      if(d.config[rainoutKey]){
+        try{
+          const rl=typeof d.config[rainoutKey]==='string'?JSON.parse(d.config[rainoutKey]):d.config[rainoutKey];
+          if(Array.isArray(rl)) yr.rainouts=rl;
         }catch(e){}
       }
     }
@@ -1681,6 +1697,14 @@ function markRainout(){
     yr.rainouts.push(wk);
     saveDB(db);renderHome();syncAdminUI();
     showToast(`Week ${wk} marked as rainout ⛅`);
+    // Sync rainout to sheet
+    const rdb=getDB();
+    if(rdb.sheetUrl){
+      fetch(rdb.sheetUrl,{method:'POST',body:JSON.stringify({
+        action:'saveConfig',
+        data:{['rainouts_'+rdb.activeYear]: JSON.stringify(yr.rainouts)}
+      })}).catch(()=>{});
+    }
   });
 }
 
@@ -1692,6 +1716,24 @@ function overrideSide(side){
   document.getElementById('side-override-status').textContent=
     `Week ${wk} overridden to ${side==='front'?'Front 9':'Back 9'}`;
   showToast(`Course side changed to ${side==='front'?'Front 9':'Back 9'}`);
+  // Push override to Sheet so all phones pick it up on next refresh
+  syncOverrideToSheet(wk, side);
+}
+
+async function syncOverrideToSheet(wk, side){
+  const db=getDB();if(!db.sheetUrl)return;
+  try{
+    await fetch(db.sheetUrl,{method:'POST',body:JSON.stringify({
+      action:'saveConfig',
+      data:{
+        ['sideOverride_'+db.activeYear+'_wk'+wk]: side,
+        ['currentSide_'+db.activeYear]: side
+      }
+    })});
+    showToast('Side override synced to all phones ✓');
+  }catch(e){
+    showToast('Saved locally — others should refresh');
+  }
 }
 
 function saveScrambleSettings(){
