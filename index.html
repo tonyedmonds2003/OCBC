@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>OCBC Golf League</title>
+<title>OCBC Golf League v1.5</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="OCBC GL">
@@ -223,7 +223,8 @@ label:first-child{margin-top:0}
   <div id="sync-bar" style="display:flex;align-items:center;gap:6px;padding:5px 14px;background:var(--white);border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">
     <div class="sync-dot" id="sync-dot"></div>
     <span id="sync-status">Not connected</span>
-    <button class="refresh-btn" style="margin-left:auto;font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:20px;background:none;cursor:pointer" onclick="refreshFromSheet()">⟳ Refresh</button>
+    <span style="margin-left:auto;color:var(--border);font-size:10px">v1.5</span>
+    <button class="refresh-btn" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:20px;background:none;cursor:pointer" onclick="refreshFromSheet()">⟳ Refresh</button>
   </div>
   <div class="section">
     <div class="stat-grid">
@@ -720,8 +721,6 @@ async function loadFromSheet(url, year){
     // Merge: sheet is source of truth for weeks
     if(d.rounds && d.rounds.length>0){
       yr.weeks=d.rounds;
-      // Only auto-advance week/side if no season start date is set
-      // If season start date is set, the date calculation handles it automatically
       if(!yr.seasonStartDate){
         const lastWeek=Math.max(...d.rounds.map(w=>w.week||0));
         if(lastWeek>=yr.currentWeek) yr.currentWeek=lastWeek+1;
@@ -729,40 +728,15 @@ async function loadFromSheet(url, year){
         yr.currentSide=lastRound.side==='front'?'back':'front';
       }
     }
-    // Load config overrides if sheet has them
-    if(d.config){
-      if(d.config.currentWeek) yr.currentWeek=parseInt(d.config.currentWeek);
-      if(d.config.currentSide) yr.currentSide=d.config.currentSide;
-      // Pick up side override set by commissioner
-      const wk=calcCurrentWeek(yr);
-      const overrideKey='sideOverride_'+db.activeYear+'_wk'+wk;
-      if(d.config[overrideKey]){
-        yr.sideOverride=d.config[overrideKey];
-      } else {
-        yr.sideOverride=null; // clear any old override
-      }
-      // Roster: sheet is source of truth if it has players defined
-      if(d.config.players){
-        try{
-          const pl=typeof d.config.players==='string'?JSON.parse(d.config.players):d.config.players;
-          if(Array.isArray(pl)&&pl.length>0) db.players=pl;
-        }catch(e){}
-      }
-      if(d.config.subs){
-        try{
-          const sl=typeof d.config.subs==='string'?JSON.parse(d.config.subs):d.config.subs;
-          if(Array.isArray(sl)) db.subs=sl;
-        }catch(e){}
-      }
-      // Pick up rainouts set by commissioner
-      const rainoutKey='rainouts_'+db.activeYear;
-      if(d.config[rainoutKey]){
-        try{
-          const rl=typeof d.config[rainoutKey]==='string'?JSON.parse(d.config[rainoutKey]):d.config[rainoutKey];
-          if(Array.isArray(rl)) yr.rainouts=rl;
-        }catch(e){}
-      }
-    }
+    // Always fetch config separately — getAllRounds may return null config when no rounds
+    setLoadMsg('Loading settings...');
+    try{
+      const cr=await fetch(url+'?action=getConfig&year='+encodeURIComponent(year));
+      const cd=await cr.json();
+      if(cd.ok && cd.config) applyConfig(db, yr, cd.config);
+    }catch(ce){}
+    // Also apply config from rounds response as fallback
+    if(d.config) applyConfig(db, yr, d.config);
     saveDB(db);
     setSynced('Loaded from Google Sheets ✓');
     setLoadMsg('Season data loaded!');
@@ -771,6 +745,41 @@ async function loadFromSheet(url, year){
     setSyncErr(msg);
     setLoadMsg(msg);
     await sleep(600);
+  }
+}
+
+function applyConfig(db, yr, cfg){
+  if(!cfg) return;
+  if(cfg.currentWeek) yr.currentWeek=parseInt(cfg.currentWeek);
+  if(cfg.currentSide) yr.currentSide=cfg.currentSide;
+  // Side override — keyed by year+week
+  const wk=calcCurrentWeek(yr);
+  const overrideKey='sideOverride_'+db.activeYear+'_wk'+wk;
+  if(cfg[overrideKey]){
+    yr.sideOverride=cfg[overrideKey];
+  } else if(!yr.sideOverride) {
+    yr.sideOverride=null;
+  }
+  // Roster
+  if(cfg.players){
+    try{
+      const pl=typeof cfg.players==='string'?JSON.parse(cfg.players):cfg.players;
+      if(Array.isArray(pl)&&pl.length>0) db.players=pl;
+    }catch(e){}
+  }
+  if(cfg.subs){
+    try{
+      const sl=typeof cfg.subs==='string'?JSON.parse(cfg.subs):cfg.subs;
+      if(Array.isArray(sl)) db.subs=sl;
+    }catch(e){}
+  }
+  // Rainouts
+  const rainoutKey='rainouts_'+db.activeYear;
+  if(cfg[rainoutKey]){
+    try{
+      const rl=typeof cfg[rainoutKey]==='string'?JSON.parse(cfg[rainoutKey]):cfg[rainoutKey];
+      if(Array.isArray(rl)) yr.rainouts=rl;
+    }catch(e){}
   }
 }
 
